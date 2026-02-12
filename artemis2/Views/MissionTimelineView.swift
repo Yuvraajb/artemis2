@@ -11,6 +11,7 @@ import SwiftUI
 struct MissionTimelineView: View {
     @Bindable var viewModel: MissionViewModel
     @State private var expandedPhase: MissionPhase? = nil
+    @Environment(AccessibilitySettings.self) private var a11y
 
     var body: some View {
         ZStack {
@@ -24,8 +25,8 @@ struct MissionTimelineView: View {
                         // Header
                         VStack(spacing: 8) {
                             Text("MISSION TIMELINE")
-                                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .font(.system(size: a11y.scaled(12), weight: .bold, design: .monospaced))
+                                .foregroundStyle(.white.opacity(a11y.secondaryTextOpacity))
                                 .tracking(4)
 
                             CountdownDisplay(
@@ -65,8 +66,12 @@ struct MissionTimelineView: View {
                     }
                 }
                 .onChange(of: viewModel.currentPhase) { _, newPhase in
-                    withAnimation(.easeInOut(duration: 0.5)) {
+                    if a11y.reduceMotion {
                         proxy.scrollTo(newPhase, anchor: .center)
+                    } else {
+                        withAnimation(.easeInOut(duration: 0.5)) {
+                            proxy.scrollTo(newPhase, anchor: .center)
+                        }
                     }
                 }
             }
@@ -74,8 +79,12 @@ struct MissionTimelineView: View {
     }
 
     private func togglePhase(_ phase: MissionPhase) {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        if a11y.reduceMotion {
             expandedPhase = expandedPhase == phase ? nil : phase
+        } else {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                expandedPhase = expandedPhase == phase ? nil : phase
+            }
         }
     }
 }
@@ -102,6 +111,9 @@ struct TimelinePhaseCard: View {
             contentCard
         }
         .padding(.leading, 16)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(phase.name), \(status == .completed ? "completed" : status == .active ? "currently active" : "upcoming")")
+        .accessibilityHint(isExpanded ? "Expanded. Double tap to collapse." : "Collapsed. Double tap to expand and see details.")
     }
 
     // MARK: - Timeline Connector
@@ -248,6 +260,8 @@ struct TimelinePhaseCard: View {
                         .stroke(Color.yellow.opacity(0.15), lineWidth: 1)
                 )
         )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Educational topic: \(phase.educationalTopic)")
     }
 
     @ViewBuilder
@@ -310,6 +324,9 @@ struct TimelinePhaseCard: View {
                     .foregroundStyle(.green.opacity(0.6))
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(milestone.name)\(milestone.isInteractive ? ", interactive challenge" : "")")
+        .accessibilityValue(isReached ? "Reached" : "Not yet reached")
     }
 
     @ViewBuilder
@@ -325,6 +342,8 @@ struct TimelinePhaseCard: View {
                 .foregroundStyle(phase.color)
             }
             .buttonStyle(GlowingButtonStyle(color: phase.color))
+            .accessibilityLabel("Skip to \(phase.name) phase")
+            .accessibilityHint("Double tap to jump the mission timeline forward to this phase")
         }
     }
 
@@ -344,6 +363,7 @@ private enum PhaseStatus {
 
 struct ScoreSummaryCard: View {
     let results: [ChallengeResult]
+    @Environment(AccessibilitySettings.self) private var a11y
 
     var totalScore: Double {
         results.reduce(0) { $0 + $1.score }
@@ -352,22 +372,22 @@ struct ScoreSummaryCard: View {
     var body: some View {
         VStack(spacing: 12) {
             Text("CHALLENGE RESULTS")
-                .font(.system(size: 10, weight: .heavy, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.5))
+                .font(.system(size: a11y.scaled(10), weight: .heavy, design: .monospaced))
+                .foregroundStyle(.white.opacity(a11y.secondaryTextOpacity))
                 .tracking(2)
 
             Text(String(format: "%.0f", totalScore))
-                .font(.system(size: 36, weight: .heavy, design: .rounded))
+                .font(.system(size: a11y.scaled(36), weight: .heavy, design: .rounded))
                 .foregroundStyle(.yellow)
 
             Text("TOTAL SCORE")
-                .font(.system(size: 9, weight: .bold))
+                .font(.system(size: a11y.scaled(9), weight: .bold))
                 .foregroundStyle(.white.opacity(0.4))
 
             ForEach(results) { result in
                 HStack {
                     Image(systemName: result.passed ? "checkmark.circle.fill" : "xmark.circle.fill")
-                        .foregroundStyle(result.passed ? .green : .red)
+                        .foregroundStyle(result.passed ? a11y.successColor : a11y.failureColor)
 
                     Text(result.phase.name)
                         .font(.system(size: 12, weight: .medium))
@@ -379,6 +399,8 @@ struct ScoreSummaryCard: View {
                         .font(.system(size: 13, weight: .bold, design: .monospaced))
                         .foregroundStyle(.yellow)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(result.phase.name) challenge: \(result.passed ? "passed" : "failed"), score \(String(format: "%.0f", result.score))")
             }
         }
         .padding(16)
@@ -388,4 +410,5 @@ struct ScoreSummaryCard: View {
 
 #Preview {
     MissionTimelineView(viewModel: MissionViewModel())
+        .environment(AccessibilitySettings())
 }

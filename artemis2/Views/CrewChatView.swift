@@ -12,6 +12,7 @@ struct CrewChatView: View {
     @State var viewModel: CrewChatViewModel
     @FocusState private var isInputFocused: Bool
     @Environment(\.dismiss) private var dismiss
+    @Environment(AccessibilitySettings.self) private var a11y
 
     init(crewMember: CrewMember) {
         _viewModel = State(initialValue: CrewChatViewModel(crewMember: crewMember))
@@ -49,6 +50,8 @@ struct CrewChatView: View {
                         .font(.system(size: 13))
                         .foregroundStyle(.white.opacity(0.6))
                 }
+                .accessibilityLabel("Reset conversation")
+                .accessibilityHint("Double tap to clear the chat and start over")
             }
         }
     }
@@ -87,7 +90,7 @@ struct CrewChatView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
                     .padding(.bottom, 8)
-                    .animation(.easeOut(duration: 0.25), value: viewModel.messages.count)
+                    .animation(a11y.reduceMotion ? nil : .easeOut(duration: 0.25), value: viewModel.messages.count)
                 }
                 .onChange(of: viewModel.messages.count) { _, _ in
                     scrollToBottom(proxy: proxy)
@@ -128,6 +131,8 @@ struct CrewChatView: View {
                 .onSubmit {
                     Task { await viewModel.sendMessage() }
                 }
+                .accessibilityLabel("Message input")
+                .accessibilityHint("Type your question about the mission or \(viewModel.crewMember.name)'s career")
 
             // Send button
             Button(action: {
@@ -142,6 +147,8 @@ struct CrewChatView: View {
                     )
             }
             .disabled(viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isGenerating)
+            .accessibilityLabel("Send message")
+            .accessibilityHint(viewModel.isGenerating ? "Waiting for response" : "Double tap to send your message")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -229,6 +236,7 @@ struct CrewChatView: View {
 
 struct TypingDotsIndicator: View {
     @State private var animating = false
+    @Environment(AccessibilitySettings.self) private var a11y
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
@@ -242,41 +250,60 @@ struct TypingDotsIndicator: View {
                     .foregroundStyle(.white.opacity(0.6))
             }
 
-            HStack(spacing: 5) {
-                ForEach(0..<3, id: \.self) { index in
-                    Circle()
-                        .fill(Color.white.opacity(animating ? 0.6 : 0.25))
-                        .frame(width: 7, height: 7)
-                        .scaleEffect(animating ? 1.0 : 0.6)
-                        .offset(y: animating ? -5 : 1)
-                        .animation(
-                            .easeInOut(duration: 0.45)
-                            .repeatForever(autoreverses: true)
-                            .delay(Double(index) * 0.18),
-                            value: animating
-                        )
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 18)
-                    .fill(Color.white.opacity(0.06))
-                    .overlay(
+            if a11y.reduceMotion {
+                // Static "typing..." text instead of animated dots
+                Text("Typing...")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(
                         RoundedRectangle(cornerRadius: 18)
-                            .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                            .fill(Color.white.opacity(0.06))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 18)
+                                    .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                            )
                     )
-            )
+            } else {
+                HStack(spacing: 5) {
+                    ForEach(0..<3, id: \.self) { index in
+                        Circle()
+                            .fill(Color.white.opacity(animating ? 0.6 : 0.25))
+                            .frame(width: 7, height: 7)
+                            .scaleEffect(animating ? 1.0 : 0.6)
+                            .offset(y: animating ? -5 : 1)
+                            .animation(
+                                .easeInOut(duration: 0.45)
+                                .repeatForever(autoreverses: true)
+                                .delay(Double(index) * 0.18),
+                                value: animating
+                            )
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(Color.white.opacity(0.06))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 18)
+                                .stroke(Color.white.opacity(0.08), lineWidth: 0.5)
+                        )
+                )
+            }
 
             Spacer()
         }
         .padding(.leading, 4)
         .onAppear {
-            // Trigger the animation on next run-loop tick so SwiftUI sees the transition
+            guard !a11y.reduceMotion else { return }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 animating = true
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Astronaut is typing")
     }
 }
 
@@ -327,6 +354,8 @@ struct ChatBubble: View {
                 Spacer(minLength: 50)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(isUser ? "You said: \(message.text)" : "\(astronautName) said: \(message.text)")
     }
 
     private var bubbleBackground: some View {
@@ -365,14 +394,16 @@ struct ChatBubble: View {
 
 struct StreamingCursor: View {
     @State private var visible = true
+    @Environment(AccessibilitySettings.self) private var a11y
 
     var body: some View {
         Rectangle()
             .fill(Color.cyan)
             .frame(width: 2, height: 14)
-            .opacity(visible ? 1 : 0)
+            .opacity(a11y.reduceMotion ? 1 : (visible ? 1 : 0))
             .padding(.leading, 2)
             .onAppear {
+                guard !a11y.reduceMotion else { return }
                 withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
                     visible = false
                 }
@@ -386,5 +417,6 @@ struct StreamingCursor: View {
     NavigationStack {
         CrewChatView(crewMember: CrewMember.artemisIICrew[0])
     }
+    .environment(AccessibilitySettings())
     .preferredColorScheme(.dark)
 }

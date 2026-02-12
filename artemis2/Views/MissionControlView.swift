@@ -31,6 +31,8 @@ struct MissionControlView: View {
                     GeometryReader { geo in
                         OrbitSceneView(viewModel: viewModel)
                             .frame(width: geo.size.width, height: geo.size.height)
+                            .accessibilityLabel("3D orbital visualization showing \(viewModel.currentPhase.name)")
+                            .accessibilityHint("Displays Earth, Moon, and the Orion spacecraft trajectory")
                     }
                     .frame(height: 340)
 
@@ -138,6 +140,9 @@ struct MissionProgressBar: View {
                         }
                     }
                     .frame(maxWidth: .infinity)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(phase.shortName)")
+                    .accessibilityValue(isPast ? "Completed" : (isActive ? "Current phase" : "Upcoming"))
                 }
             }
 
@@ -157,10 +162,12 @@ struct MissionProgressBar: View {
                             )
                         )
                         .frame(width: max(0, geometry.size.width * viewModel.overallProgress))
-                        .animation(.easeInOut(duration: 0.3), value: viewModel.overallProgress)
                 }
             }
             .frame(height: 3)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Mission progress")
+            .accessibilityValue("\(Int(viewModel.overallProgress * 100)) percent complete, current phase: \(viewModel.currentPhase.name)")
         }
     }
 }
@@ -249,6 +256,9 @@ struct TelemetryDashboard: View {
                         .foregroundStyle(.white.opacity(0.7))
                 }
                 .frame(width: 90)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Next milestone")
+                .accessibilityValue("\(viewModel.nextMilestone?.name ?? "Mission complete"), \(viewModel.distanceToNextMilestone)")
             }
             .padding(.vertical, 8)
             .padding(.horizontal, 10)
@@ -278,6 +288,8 @@ struct TimeControlPanel: View {
                             )
                     )
             }
+            .accessibilityLabel(viewModel.isRunning ? "Pause mission simulation" : "Play mission simulation")
+            .accessibilityHint("Double tap to \(viewModel.isRunning ? "pause" : "start") the mission timeline")
 
             // Time warp selector
             HStack(spacing: 4) {
@@ -304,8 +316,13 @@ struct TimeControlPanel: View {
                                 )
                         )
                     }
+                    .accessibilityLabel("Time warp \(warp.label)")
+                    .accessibilityValue(viewModel.timeWarp == warp ? "Selected" : "Not selected")
+                    .accessibilityHint("Double tap to set simulation speed to \(warp.label)")
                 }
             }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Time warp controls")
 
             Spacer()
 
@@ -317,6 +334,8 @@ struct TimeControlPanel: View {
                     .frame(width: 36, height: 36)
                     .background(Circle().fill(Color.white.opacity(0.05)))
             }
+            .accessibilityLabel("Reset mission")
+            .accessibilityHint("Double tap to restart the mission from the beginning")
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 12)
@@ -326,4 +345,5 @@ struct TimeControlPanel: View {
 
 #Preview {
     MissionControlView(viewModel: MissionViewModel())
+        .environment(AccessibilitySettings())
 }

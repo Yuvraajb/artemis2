@@ -10,8 +10,6 @@ import SwiftUI
 
 struct CrewModuleView: View {
     let viewModel: MissionViewModel
-    @State private var selectedCrew: CrewMember? = nil
-    @State private var showCrewDetail: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -44,22 +42,22 @@ struct CrewModuleView: View {
                         InteriorStatusPanel(viewModel: viewModel)
                             .padding(.horizontal, 16)
 
-                        // Crew cards
-                        VStack(spacing: 8) {
+                        // Crew grid
+                        VStack(spacing: 12) {
                             Text("CREW MANIFEST")
                                 .font(.system(size: 10, weight: .heavy, design: .monospaced))
                                 .foregroundStyle(.white.opacity(0.4))
                                 .tracking(2)
 
-                            Text("Tap for bio  ·  Chat icon to talk")
-                                .font(.system(size: 9))
-                                .foregroundStyle(.white.opacity(0.25))
-
-                            ForEach(CrewMember.artemisIICrew) { member in
-                                CrewCard(member: member, onTap: {
-                                    selectedCrew = member
-                                    showCrewDetail = true
-                                })
+                            // 2x2 grid
+                            let crew = CrewMember.artemisIICrew
+                            LazyVGrid(columns: [
+                                GridItem(.flexible(), spacing: 16),
+                                GridItem(.flexible(), spacing: 16)
+                            ], spacing: 16) {
+                                ForEach(crew) { member in
+                                    CrewCircleCard(member: member)
+                                }
                             }
                         }
                         .padding(.horizontal, 16)
@@ -73,13 +71,6 @@ struct CrewModuleView: View {
                 }
             }
             .navigationBarHidden(true)
-            .sheet(isPresented: $showCrewDetail) {
-                if let crew = selectedCrew {
-                    CrewDetailSheet(member: crew)
-                        .presentationDetents([.medium])
-                        .presentationDragIndicator(.visible)
-                }
-            }
         }
     }
 }
@@ -130,6 +121,21 @@ struct CapsuleWindowView: View {
                 .background(Capsule().fill(.black.opacity(0.6)))
                 .padding(.bottom, 12)
             }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Crew perspective window, showing \(windowDescription)")
+    }
+
+    private var windowDescription: String {
+        switch viewModel.currentPhase {
+        case .prelaunch: return "view from Launch Complex 39B at Kennedy Space Center under blue sky"
+        case .launch: return "launch ascent with fire and engine exhaust"
+        case .earthOrbit: return "Earth's horizon below with stars above from low Earth orbit"
+        case .translunarInjection: return "Earth getting smaller as the spacecraft accelerates toward the Moon"
+        case .translunarCoast: return "deep space view with Earth behind and Moon ahead"
+        case .lunarFlyby: return "the lunar far side surface filling the window, farthest humans have ever traveled"
+        case .returnTransit: return "Earth growing larger on the return journey home"
+        case .reentry: return "intense heat and plasma around the capsule during atmospheric reentry"
         }
     }
 
@@ -381,127 +387,118 @@ struct EnvironmentReadout: View {
                 .foregroundStyle(.white.opacity(0.5))
         }
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(value)
     }
 }
 
-// MARK: - Crew Card
+// MARK: - Crew Circle Card (2x2 grid item)
 
-struct CrewCard: View {
+struct CrewCircleCard: View {
     let member: CrewMember
-    let onTap: () -> Void
+
+    private var initials: String {
+        member.name.components(separatedBy: " ")
+            .compactMap { $0.first.map(String.init) }
+            .joined()
+    }
+
+    private var roleColor: Color {
+        switch member.role {
+        case "Commander": return .orange
+        case "Pilot": return .cyan
+        case "Mission Specialist 1": return .purple
+        case "Mission Specialist 2": return .green
+        default: return .cyan
+        }
+    }
 
     var body: some View {
-        HStack(spacing: 0) {
-            // Main card area — tappable for bio sheet
-            Button(action: onTap) {
-                HStack(spacing: 12) {
-                    // Avatar
-                    ZStack {
-                        Circle()
-                            .fill(Color.white.opacity(0.1))
-                            .frame(width: 44, height: 44)
+        VStack(spacing: 10) {
+            // Circular avatar
+            ZStack {
+                // Outer glow ring
+                Circle()
+                    .stroke(roleColor.opacity(0.3), lineWidth: 2)
+                    .frame(width: 88, height: 88)
 
-                        Image(systemName: member.imageName)
-                            .font(.system(size: 22))
-                            .foregroundStyle(.white.opacity(0.7))
-                    }
+                // Background circle
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [roleColor.opacity(0.15), Color.white.opacity(0.05)],
+                            center: .center,
+                            startRadius: 5,
+                            endRadius: 44
+                        )
+                    )
+                    .frame(width: 82, height: 82)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(member.name)
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.white)
+                // Initials
+                Text(initials)
+                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.9))
 
-                        Text(member.role)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.cyan)
-
-                        HStack(spacing: 4) {
-                            Text(member.agency)
-                                .font(.system(size: 9, weight: .medium))
-                            Text("•")
-                            Text(member.nationality)
-                                .font(.system(size: 9))
-                        }
-                        .foregroundStyle(.white.opacity(0.4))
-                    }
-
+                // Agency badge
+                VStack {
                     Spacer()
+                    HStack {
+                        Spacer()
+                        Text(member.agency)
+                            .font(.system(size: 7, weight: .heavy))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(roleColor.opacity(0.8))
+                            )
+                    }
                 }
+                .frame(width: 88, height: 88)
             }
 
-            // Chat button — NavigationLink to chat view
+            // Name
+            Text(member.name.components(separatedBy: " ").first ?? member.name)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+
+            Text(member.role)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(roleColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+
+            // Chat link
             NavigationLink(destination: CrewChatView(crewMember: member)) {
-                VStack(spacing: 3) {
+                HStack(spacing: 5) {
                     Image(systemName: "bubble.left.and.text.bubble.right.fill")
-                        .font(.system(size: 14))
+                        .font(.system(size: 10))
                     Text("Chat")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: 10, weight: .semibold))
                 }
                 .foregroundStyle(.cyan)
-                .frame(width: 52, height: 52)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
                 .background(
-                    RoundedRectangle(cornerRadius: 10)
+                    Capsule()
                         .fill(Color.cyan.opacity(0.1))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 10)
+                            Capsule()
                                 .stroke(Color.cyan.opacity(0.25), lineWidth: 1)
                         )
                 )
             }
+            .accessibilityLabel("Chat with \(member.name)")
+            .accessibilityHint("Double tap to open a conversation with \(member.name)")
         }
-        .padding(12)
+        .padding(.vertical, 14)
+        .padding(.horizontal, 8)
         .glassCard()
-    }
-}
-
-// MARK: - Crew Detail Sheet
-
-struct CrewDetailSheet: View {
-    let member: CrewMember
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        ZStack {
-            Color(red: 0.02, green: 0.02, blue: 0.1)
-                .ignoresSafeArea()
-
-            VStack(spacing: 16) {
-                // Avatar
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.08))
-                        .frame(width: 80, height: 80)
-
-                    Image(systemName: member.imageName)
-                        .font(.system(size: 40))
-                        .foregroundStyle(.white.opacity(0.7))
-                }
-
-                VStack(spacing: 4) {
-                    Text(member.name)
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(.white)
-
-                    Text(member.role)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.cyan)
-
-                    Text("\(member.agency) • \(member.nationality)")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.white.opacity(0.5))
-                }
-
-                Text(member.bio)
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.8))
-                    .lineSpacing(6)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 20)
-
-                Spacer()
-            }
-            .padding(.top, 24)
-        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(member.name), \(member.role), \(member.agency)")
     }
 }
 
@@ -547,9 +544,12 @@ struct CurrentActivityCard: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Current crew activity: \(activity.0). \(activity.1)")
     }
 }
 
 #Preview {
     CrewModuleView(viewModel: MissionViewModel())
+        .environment(AccessibilitySettings())
 }

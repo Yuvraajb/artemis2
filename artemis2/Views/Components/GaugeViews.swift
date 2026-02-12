@@ -72,6 +72,9 @@ struct CircularGauge: View {
                 .font(.system(size: 9, weight: .medium))
                 .foregroundStyle(.white.opacity(0.7))
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label) gauge")
+        .accessibilityValue("\(displayValue) \(unit), \(Int(progress * 100)) percent of maximum")
     }
 }
 
@@ -114,6 +117,9 @@ struct TelemetryBar: View {
             }
             .frame(height: 4)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(value)
     }
 }
 
@@ -143,6 +149,9 @@ struct DataReadout: View {
                     .foregroundStyle(color)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue(value)
     }
 }
 
@@ -170,6 +179,9 @@ struct PhaseBadge: View {
                 )
         )
         .foregroundStyle(isActive ? phase.color : .white.opacity(0.5))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(phase.shortName) phase")
+        .accessibilityValue(isActive ? "Currently active" : "Inactive")
     }
 }
 
@@ -177,12 +189,20 @@ struct PhaseBadge: View {
 
 struct GForceIndicator: View {
     let gForce: Double
+    @Environment(AccessibilitySettings.self) private var a11y
 
     private var color: Color {
-        if gForce < 1.5 { return .green }
-        if gForce < 3.0 { return .yellow }
+        if gForce < 1.5 { return a11y.safeColor }
+        if gForce < 3.0 { return a11y.warningColor }
         if gForce < 4.0 { return .orange }
-        return .red
+        return a11y.dangerColor
+    }
+
+    private var severityDescription: String {
+        if gForce < 1.5 { return "normal" }
+        if gForce < 3.0 { return "moderate" }
+        if gForce < 4.0 { return "high" }
+        return "extreme"
     }
 
     var body: some View {
@@ -208,6 +228,9 @@ struct GForceIndicator: View {
                 }
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("G-Force indicator")
+        .accessibilityValue(String(format: "%.1f G, %@", gForce, severityDescription))
     }
 }
 
@@ -251,6 +274,9 @@ struct SpeedTape: View {
                 .font(.system(size: 8))
                 .foregroundStyle(.white.opacity(0.5))
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Speed tape")
+        .accessibilityValue(String(format: "%.1f kilometers per second", speed))
     }
 }
 
@@ -276,6 +302,9 @@ struct CountdownDisplay: View {
                     .tracking(2)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(phase == .prelaunch ? "Countdown to launch" : "Mission elapsed time")
+        .accessibilityValue(timeString)
     }
 }
 
@@ -305,15 +334,16 @@ struct GlowingButtonStyle: ButtonStyle {
 
 struct GlassCard: ViewModifier {
     var opacity: Double = 0.12
+    @Environment(AccessibilitySettings.self) private var a11y
 
     func body(content: Content) -> some View {
         content
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(.ultraThinMaterial.opacity(opacity))
+                    .fill(.ultraThinMaterial.opacity(a11y.highContrast ? max(opacity, 0.25) : opacity))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                            .stroke(Color.white.opacity(a11y.borderOpacity), lineWidth: a11y.highContrast ? 1.5 : 1)
                     )
             )
     }

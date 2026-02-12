@@ -12,6 +12,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var viewModel = MissionViewModel()
+    @State private var a11ySettings = AccessibilitySettings()
     @State private var selectedTab: AppTab = .missionControl
     @State private var showLaunchScreen = true
 
@@ -19,16 +20,21 @@ struct ContentView: View {
         ZStack {
             if showLaunchScreen {
                 LaunchScreenView {
-                    withAnimation(.easeInOut(duration: 0.8)) {
+                    if a11ySettings.reduceMotion {
                         showLaunchScreen = false
+                    } else {
+                        withAnimation(.easeInOut(duration: 0.8)) {
+                            showLaunchScreen = false
+                        }
                     }
                 }
-                .transition(.opacity)
+                .transition(a11ySettings.reduceMotion ? .identity : .opacity)
             } else {
                 mainContent
-                    .transition(.opacity)
+                    .transition(a11ySettings.reduceMotion ? .identity : .opacity)
             }
         }
+        .environment(a11ySettings)
         .preferredColorScheme(.dark)
     }
 
@@ -51,6 +57,12 @@ struct ContentView: View {
                     Label("Crew", systemImage: "person.3.fill")
                 }
                 .tag(AppTab.crew)
+
+            AccessibilitySettingsView()
+                .tabItem {
+                    Label("Settings", systemImage: "gearshape.fill")
+                }
+                .tag(AppTab.settings)
         }
         .tint(.cyan)
     }
@@ -62,12 +74,14 @@ enum AppTab: String {
     case missionControl
     case timeline
     case crew
+    case settings
 }
 
 // MARK: - Launch Screen
 
 struct LaunchScreenView: View {
     let onContinue: () -> Void
+    @Environment(AccessibilitySettings.self) private var a11y
     @State private var logoScale: CGFloat = 0.5
     @State private var logoOpacity: Double = 0
     @State private var titleOffset: CGFloat = 30
@@ -100,6 +114,7 @@ struct LaunchScreenView: View {
                 }
             }
             .ignoresSafeArea()
+            .accessibilityHidden(true)
 
             VStack(spacing: 24) {
                 Spacer()
@@ -146,6 +161,8 @@ struct LaunchScreenView: View {
                 }
                 .scaleEffect(logoScale)
                 .opacity(logoOpacity)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Artemis II mission patch")
 
                 // Title text
                 VStack(spacing: 8) {
@@ -182,6 +199,8 @@ struct LaunchScreenView: View {
                 }
                 .offset(y: titleOffset)
                 .opacity(logoOpacity)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Artemis II, Journey to the Moon, Interactive Mission Simulator")
 
                 Spacer()
 
@@ -208,6 +227,8 @@ struct LaunchScreenView: View {
                         )
                     }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .accessibilityLabel("Begin mission")
+                    .accessibilityHint("Double tap to start the Artemis II mission simulator")
                 }
 
                 Spacer()
@@ -215,15 +236,22 @@ struct LaunchScreenView: View {
             }
         }
         .onAppear {
-            withAnimation(.easeOut(duration: 1.2)) {
+            if a11y.reduceMotion {
                 logoScale = 1.0
                 logoOpacity = 1.0
-            }
-            withAnimation(.easeOut(duration: 1.0).delay(0.3)) {
                 titleOffset = 0
-            }
-            withAnimation(.easeIn(duration: 0.6).delay(1.2)) {
                 showButton = true
+            } else {
+                withAnimation(.easeOut(duration: 1.2)) {
+                    logoScale = 1.0
+                    logoOpacity = 1.0
+                }
+                withAnimation(.easeOut(duration: 1.0).delay(0.3)) {
+                    titleOffset = 0
+                }
+                withAnimation(.easeIn(duration: 0.6).delay(1.2)) {
+                    showButton = true
+                }
             }
         }
     }
