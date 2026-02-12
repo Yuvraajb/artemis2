@@ -14,64 +14,71 @@ struct CrewModuleView: View {
     @State private var showCrewDetail: Bool = false
 
     var body: some View {
-        ZStack {
-            // Background
-            Color(red: 0.02, green: 0.02, blue: 0.08)
-                .ignoresSafeArea()
+        NavigationStack {
+            ZStack {
+                // Background
+                Color(red: 0.02, green: 0.02, blue: 0.08)
+                    .ignoresSafeArea()
 
-            ScrollView {
-                VStack(spacing: 16) {
-                    // Header
-                    VStack(spacing: 8) {
-                        Text("ORION CREW MODULE")
-                            .font(.system(size: 12, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.5))
-                            .tracking(4)
+                ScrollView {
+                    VStack(spacing: 16) {
+                        // Header
+                        VStack(spacing: 8) {
+                            Text("ORION CREW MODULE")
+                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.5))
+                                .tracking(4)
 
-                        Text("Crew of Artemis II")
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
-                    .padding(.top, 16)
+                            Text("Crew of Artemis II")
+                                .font(.system(size: 22, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+                        .padding(.top, 16)
 
-                    // Capsule Window View
-                    CapsuleWindowView(viewModel: viewModel)
-                        .frame(height: 220)
-                        .padding(.horizontal, 16)
+                        // Capsule Window View
+                        CapsuleWindowView(viewModel: viewModel)
+                            .frame(height: 220)
+                            .padding(.horizontal, 16)
 
-                    // Interior status panel
-                    InteriorStatusPanel(viewModel: viewModel)
-                        .padding(.horizontal, 16)
+                        // Interior status panel
+                        InteriorStatusPanel(viewModel: viewModel)
+                            .padding(.horizontal, 16)
 
-                    // Crew cards
-                    VStack(spacing: 8) {
-                        Text("CREW MANIFEST")
-                            .font(.system(size: 10, weight: .heavy, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.4))
-                            .tracking(2)
+                        // Crew cards
+                        VStack(spacing: 8) {
+                            Text("CREW MANIFEST")
+                                .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.4))
+                                .tracking(2)
 
-                        ForEach(CrewMember.artemisIICrew) { member in
-                            CrewCard(member: member) {
-                                selectedCrew = member
-                                showCrewDetail = true
+                            Text("Tap for bio  ·  Chat icon to talk")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.white.opacity(0.25))
+
+                            ForEach(CrewMember.artemisIICrew) { member in
+                                CrewCard(member: member, onTap: {
+                                    selectedCrew = member
+                                    showCrewDetail = true
+                                })
                             }
                         }
-                    }
-                    .padding(.horizontal, 16)
-
-                    // Current activity
-                    CurrentActivityCard(viewModel: viewModel)
                         .padding(.horizontal, 16)
 
-                    Spacer(minLength: 100)
+                        // Current activity
+                        CurrentActivityCard(viewModel: viewModel)
+                            .padding(.horizontal, 16)
+
+                        Spacer(minLength: 100)
+                    }
                 }
             }
-        }
-        .sheet(isPresented: $showCrewDetail) {
-            if let crew = selectedCrew {
-                CrewDetailSheet(member: crew)
-                    .presentationDetents([.medium])
-                    .presentationDragIndicator(.visible)
+            .navigationBarHidden(true)
+            .sheet(isPresented: $showCrewDetail) {
+                if let crew = selectedCrew {
+                    CrewDetailSheet(member: crew)
+                        .presentationDetents([.medium])
+                        .presentationDragIndicator(.visible)
+                }
             }
         }
     }
@@ -384,47 +391,66 @@ struct CrewCard: View {
     let onTap: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                // Avatar
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.1))
-                        .frame(width: 44, height: 44)
+        HStack(spacing: 0) {
+            // Main card area — tappable for bio sheet
+            Button(action: onTap) {
+                HStack(spacing: 12) {
+                    // Avatar
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.1))
+                            .frame(width: 44, height: 44)
 
-                    Image(systemName: member.imageName)
-                        .font(.system(size: 22))
-                        .foregroundStyle(.white.opacity(0.7))
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(member.name)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.white)
-
-                    Text(member.role)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.cyan)
-
-                    HStack(spacing: 4) {
-                        Text(member.agency)
-                            .font(.system(size: 9, weight: .medium))
-                        Text("•")
-                        Text(member.nationality)
-                            .font(.system(size: 9))
+                        Image(systemName: member.imageName)
+                            .font(.system(size: 22))
+                            .foregroundStyle(.white.opacity(0.7))
                     }
-                    .foregroundStyle(.white.opacity(0.4))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(member.name)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.white)
+
+                        Text(member.role)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.cyan)
+
+                        HStack(spacing: 4) {
+                            Text(member.agency)
+                                .font(.system(size: 9, weight: .medium))
+                            Text("•")
+                            Text(member.nationality)
+                                .font(.system(size: 9))
+                        }
+                        .foregroundStyle(.white.opacity(0.4))
+                    }
+
+                    Spacer()
                 }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.3))
             }
-            .padding(12)
-            .glassCard()
+
+            // Chat button — NavigationLink to chat view
+            NavigationLink(destination: CrewChatView(crewMember: member)) {
+                VStack(spacing: 3) {
+                    Image(systemName: "bubble.left.and.text.bubble.right.fill")
+                        .font(.system(size: 14))
+                    Text("Chat")
+                        .font(.system(size: 8, weight: .bold))
+                }
+                .foregroundStyle(.cyan)
+                .frame(width: 52, height: 52)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.cyan.opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.cyan.opacity(0.25), lineWidth: 1)
+                        )
+                )
+            }
         }
+        .padding(12)
+        .glassCard()
     }
 }
 
