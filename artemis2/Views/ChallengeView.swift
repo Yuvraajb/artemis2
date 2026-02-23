@@ -17,6 +17,9 @@ struct ChallengeView: View {
     @State private var isAnimating: Bool = false
     @Environment(\.dismiss) private var dismiss
     @Environment(AccessibilitySettings.self) private var a11y
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    private var isWide: Bool { sizeClass == .regular }
 
     var body: some View {
         ZStack {
@@ -62,7 +65,9 @@ struct ChallengeView: View {
                 // Action buttons
                 actionButtons
             }
-            .padding(24)
+            .padding(isWide ? 32 : 24)
+            .frame(maxWidth: isWide ? 560 : .infinity)
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -185,6 +190,11 @@ struct ChallengeView: View {
 
     private func submit() {
         let challengeResult = evaluateChallenge()
+        if challengeResult.passed {
+            HapticManager.shared.challengeSuccess()
+        } else {
+            HapticManager.shared.challengeCorrection()
+        }
         if a11y.reduceMotion {
             result = challengeResult
             hasSubmitted = true

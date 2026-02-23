@@ -312,6 +312,17 @@ struct MissionMilestone: Identifiable {
     ]
 }
 
+// MARK: - Telemetry Snapshot (for Charts)
+
+struct TelemetrySnapshot: Identifiable {
+    let id = UUID()
+    let missionTime: Double
+    let speed: Double
+    let altitude: Double
+    let gForce: Double
+    let phase: MissionPhase
+}
+
 // MARK: - Challenge Result
 
 struct ChallengeResult: Identifiable {

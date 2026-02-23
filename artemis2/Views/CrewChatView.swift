@@ -13,13 +13,14 @@ struct CrewChatView: View {
     @FocusState private var isInputFocused: Bool
     @Environment(\.dismiss) private var dismiss
     @Environment(AccessibilitySettings.self) private var a11y
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    private var isWide: Bool { sizeClass == .regular }
 
     init(crewMember: CrewMember) {
         _viewModel = State(initialValue: CrewChatViewModel(crewMember: crewMember))
     }
 
-    /// Whether to show the bouncing-dots indicator:
-    /// only while generating AND the placeholder bubble is still empty (no tokens yet).
     private var showTypingDots: Bool {
         guard viewModel.isGenerating,
               let last = viewModel.messages.last,
@@ -29,12 +30,13 @@ struct CrewChatView: View {
 
     var body: some View {
         ZStack {
-            // Background
             Color(red: 0.02, green: 0.02, blue: 0.08)
                 .ignoresSafeArea()
 
             if viewModel.isModelAvailable {
                 chatContent
+                    .frame(maxWidth: isWide ? 680 : .infinity)
+                    .frame(maxWidth: .infinity)
             } else {
                 unavailableView
             }

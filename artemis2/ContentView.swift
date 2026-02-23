@@ -15,7 +15,7 @@ struct ContentView: View {
     @State private var a11ySettings = AccessibilitySettings()
     @State private var selectedTab: AppTab = .missionControl
     @State private var showLaunchScreen = true
-
+    
     var body: some View {
         ZStack {
             if showLaunchScreen {

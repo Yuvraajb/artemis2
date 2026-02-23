@@ -10,6 +10,9 @@ import SwiftUI
 
 struct MissionControlView: View {
     @Bindable var viewModel: MissionViewModel
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    private var isWide: Bool { sizeClass == .regular }
 
     var body: some View {
         ZStack {
@@ -25,83 +28,10 @@ struct MissionControlView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                // 3D Scene View - takes upper portion
-                ZStack(alignment: .topLeading) {
-                    GeometryReader { geo in
-                        OrbitSceneView(viewModel: viewModel)
-                            .frame(width: geo.size.width, height: geo.size.height)
-                            .accessibilityLabel("3D orbital visualization showing \(viewModel.currentPhase.name)")
-                            .accessibilityHint("Displays Earth, Moon, and the Orion spacecraft trajectory")
-                    }
-                    .frame(height: 340)
-
-                    // Overlay: Phase banner & MET
-                    VStack {
-                        HStack {
-                            PhaseBadge(phase: viewModel.currentPhase, isActive: true)
-
-                            Spacer()
-
-                            CountdownDisplay(
-                                timeString: viewModel.countdownString,
-                                phase: viewModel.currentPhase
-                            )
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 8)
-
-                        Spacer()
-
-                        // Bottom overlay: quick telemetry
-                        HStack(spacing: 16) {
-                            DataReadout(
-                                label: "SPEED",
-                                value: viewModel.telemetry.formattedSpeed,
-                                icon: "gauge.with.dots.needle.33percent",
-                                color: .cyan
-                            )
-
-                            DataReadout(
-                                label: "ALTITUDE",
-                                value: viewModel.telemetry.formattedAltitude,
-                                icon: "arrow.up.to.line",
-                                color: .green
-                            )
-
-                            Spacer()
-
-                            GForceIndicator(gForce: viewModel.telemetry.gForce)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 8)
-                        .padding(.top, 4)
-                        .background(
-                            LinearGradient(
-                                colors: [.clear, .black.opacity(0.7)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                    }
-                }
-
-                // Mission progress bar
-                MissionProgressBar(viewModel: viewModel)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-
-                // Telemetry dashboard
-                TelemetryDashboard(viewModel: viewModel)
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
-
-                Spacer(minLength: 4)
-
-                // Time controls
-                TimeControlPanel(viewModel: viewModel)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
+            if isWide {
+                iPadLayout
+            } else {
+                iPhoneLayout
             }
         }
         .sheet(isPresented: $viewModel.showChallengeSheet) {
@@ -110,6 +40,194 @@ struct MissionControlView: View {
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             }
+        }
+        .fullScreenCover(isPresented: $viewModel.showMissionComplete) {
+            MissionCompleteView(viewModel: viewModel) {
+                viewModel.showMissionComplete = false
+            }
+        }
+    }
+
+    // MARK: - iPad Layout (side-by-side mission control)
+
+    private var iPadLayout: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                // Left panel: 3D orbital view
+                ZStack(alignment: .topLeading) {
+                    OrbitSceneView(viewModel: viewModel)
+                        .accessibilityLabel("3D orbital visualization showing \(viewModel.currentPhase.name)")
+                        .accessibilityHint("Displays Earth, Moon, and the Orion spacecraft trajectory")
+
+                    VStack {
+                        HStack {
+                            PhaseBadge(phase: viewModel.currentPhase, isActive: true)
+                            Spacer()
+                            CountdownDisplay(
+                                timeString: viewModel.countdownString,
+                                phase: viewModel.currentPhase,
+                                isLarge: true
+                            )
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+
+                        Spacer()
+
+                        HStack(spacing: 20) {
+                            DataReadout(label: "SPEED", value: viewModel.telemetry.formattedSpeed,
+                                       icon: "gauge.with.dots.needle.33percent", color: .cyan)
+                            DataReadout(label: "ALTITUDE", value: viewModel.telemetry.formattedAltitude,
+                                       icon: "arrow.up.to.line", color: .green)
+                            DataReadout(label: "G-FORCE", value: viewModel.telemetry.formattedGForce,
+                                       icon: "arrow.down.circle", color: viewModel.telemetry.gForce > 3 ? .red : .orange)
+                            Spacer()
+                            GForceIndicator(gForce: viewModel.telemetry.gForce)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 12)
+                        .padding(.top, 6)
+                        .background(
+                            LinearGradient(colors: [.clear, .black.opacity(0.7)],
+                                          startPoint: .top, endPoint: .bottom)
+                        )
+                    }
+                }
+                .frame(minWidth: 0, maxWidth: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                )
+                .padding(.leading, 16)
+                .padding(.trailing, 8)
+
+                // Right panel: data & charts
+                ScrollView {
+                    VStack(spacing: 12) {
+                        MissionProgressBar(viewModel: viewModel)
+
+                        TelemetryDashboard(viewModel: viewModel)
+
+                        TelemetryChartView(viewModel: viewModel)
+
+                        // Phase description card on iPad
+                        iPadPhaseInfoCard
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
+                }
+                .frame(width: 360)
+                .padding(.trailing, 16)
+                .padding(.leading, 8)
+            }
+            .padding(.top, 8)
+
+            // Time controls spanning full width
+            TimeControlPanel(viewModel: viewModel)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 10)
+                .padding(.top, 4)
+        }
+    }
+
+    private var iPadPhaseInfoCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: viewModel.currentPhase.icon)
+                    .font(.system(size: 12))
+                    .foregroundStyle(viewModel.currentPhase.color)
+                Text("CURRENT PHASE")
+                    .font(.system(size: 9, weight: .heavy, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .tracking(2)
+            }
+            Text(viewModel.currentPhase.name)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(.white)
+            Text(viewModel.currentPhase.description)
+                .font(.system(size: 11))
+                .foregroundStyle(.white.opacity(0.6))
+                .lineSpacing(3)
+
+            HStack(alignment: .top, spacing: 6) {
+                Image(systemName: "lightbulb.fill")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.yellow)
+                Text(viewModel.currentPhase.educationalTopic)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.yellow.opacity(0.8))
+            }
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.yellow.opacity(0.06))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.yellow.opacity(0.1), lineWidth: 1))
+            )
+        }
+        .padding(14)
+        .glassCard()
+    }
+
+    // MARK: - iPhone Layout (vertical stack)
+
+    private var iPhoneLayout: some View {
+        VStack(spacing: 0) {
+            ZStack(alignment: .topLeading) {
+                GeometryReader { geo in
+                    OrbitSceneView(viewModel: viewModel)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .accessibilityLabel("3D orbital visualization showing \(viewModel.currentPhase.name)")
+                        .accessibilityHint("Displays Earth, Moon, and the Orion spacecraft trajectory")
+                }
+                .frame(height: 280)
+
+                VStack {
+                    HStack {
+                        PhaseBadge(phase: viewModel.currentPhase, isActive: true)
+                        Spacer()
+                        CountdownDisplay(timeString: viewModel.countdownString, phase: viewModel.currentPhase)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+
+                    Spacer()
+
+                    HStack(spacing: 16) {
+                        DataReadout(label: "SPEED", value: viewModel.telemetry.formattedSpeed,
+                                   icon: "gauge.with.dots.needle.33percent", color: .cyan)
+                        DataReadout(label: "ALTITUDE", value: viewModel.telemetry.formattedAltitude,
+                                   icon: "arrow.up.to.line", color: .green)
+                        Spacer()
+                        GForceIndicator(gForce: viewModel.telemetry.gForce)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+                    .padding(.top, 4)
+                    .background(
+                        LinearGradient(colors: [.clear, .black.opacity(0.7)],
+                                      startPoint: .top, endPoint: .bottom)
+                    )
+                }
+            }
+
+            ScrollView {
+                VStack(spacing: 8) {
+                    MissionProgressBar(viewModel: viewModel)
+                        .padding(.horizontal, 16)
+                    TelemetryDashboard(viewModel: viewModel)
+                        .padding(.horizontal, 12)
+                    TelemetryChartView(viewModel: viewModel)
+                        .padding(.horizontal, 12)
+                }
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+            }
+
+            TimeControlPanel(viewModel: viewModel)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
         }
     }
 }
@@ -325,6 +443,20 @@ struct TimeControlPanel: View {
             .accessibilityLabel("Time warp controls")
 
             Spacer()
+
+            // Audio toggle
+            Button(action: { viewModel.toggleAudio() }) {
+                Image(systemName: viewModel.isAudioEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(viewModel.isAudioEnabled ? .cyan : .white.opacity(0.4))
+                    .frame(width: 36, height: 36)
+                    .background(
+                        Circle()
+                            .fill(viewModel.isAudioEnabled ? Color.cyan.opacity(0.15) : Color.white.opacity(0.05))
+                    )
+            }
+            .accessibilityLabel(viewModel.isAudioEnabled ? "Mute mission audio" : "Enable mission audio")
+            .accessibilityHint("Double tap to toggle the mission narration and ambient audio")
 
             // Reset button
             Button(action: { viewModel.resetMission() }) {

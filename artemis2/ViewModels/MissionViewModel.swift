@@ -42,6 +42,23 @@ final class MissionViewModel {
     var challengeResults: [ChallengeResult] = []
     var totalScore: Int = 0
 
+    // MARK: - Telemetry History (for Charts)
+
+    var telemetryHistory: [TelemetrySnapshot] = []
+    private var lastRecordedProgress: Double = -1
+    private let recordingInterval: Double = 0.002 // every 0.2% of mission
+
+    // MARK: - Mission Completion
+
+    var showMissionComplete: Bool = false
+    var peakSpeed: Double = 0
+    var peakAltitude: Double = 0
+    var peakGForce: Double = 0
+
+    // MARK: - Audio
+
+    var isAudioEnabled: Bool = true
+
     // MARK: - Countdown
 
     var countdownValue: Int = 10
@@ -65,6 +82,8 @@ final class MissionViewModel {
     private var timer: Timer?
     private let tickInterval: TimeInterval = 1.0 / 30.0 // 30 FPS
     private var lastMilestoneIndex: Int = -1
+    private var lastCountdownSecond: Int = Int.max
+    private var previousPhase: MissionPhase = .prelaunch
 
     // MARK: - Initialization
 
@@ -78,11 +97,28 @@ final class MissionViewModel {
     func startMission() {
         isRunning = true
         startTimer()
+        HapticManager.shared.resumeContinuous()
+        if isAudioEnabled {
+            MissionAudioManager.shared.startAmbient(for: currentPhase)
+        }
     }
 
     func pauseMission() {
         isRunning = false
         stopTimer()
+        HapticManager.shared.pauseContinuous()
+        if isAudioEnabled {
+            MissionAudioManager.shared.pauseAmbient()
+        }
+    }
+
+    func toggleAudio() {
+        isAudioEnabled.toggle()
+        if isAudioEnabled {
+            MissionAudioManager.shared.startAmbient(for: currentPhase)
+        } else {
+            MissionAudioManager.shared.stop()
+        }
     }
 
     func togglePlayPause() {
@@ -98,16 +134,56 @@ final class MissionViewModel {
     }
 
     func skipToPhase(_ phase: MissionPhase) {
+        HapticManager.shared.stopContinuous()
+        MissionAudioManager.shared.skipTo(missionTime: phase.startTime + 1)
+        backfillTelemetryHistory(upTo: phase.startTime + 1)
         missionTime = phase.startTime + 1
+        previousPhase = phase
+        currentPhase = phase
         updateState()
+    }
+
+    /// Pre-compute telemetry snapshots for skipped mission time
+    private func backfillTelemetryHistory(upTo targetTime: Double) {
+        let startTime = max(0, missionTime)
+        guard targetTime > startTime else { return }
+        let steps = 100
+        let stepSize = (targetTime - startTime) / Double(steps)
+        for i in 0...steps {
+            let t = startTime + Double(i) * stepSize
+            let telem = OrbitalMechanics.computeTelemetry(missionTime: t)
+            let phase = OrbitalMechanics.currentPhase(at: t)
+            let snapshot = TelemetrySnapshot(
+                missionTime: t,
+                speed: telem.speed,
+                altitude: telem.altitude,
+                gForce: telem.gForce,
+                phase: phase
+            )
+            telemetryHistory.append(snapshot)
+            if telem.speed > peakSpeed { peakSpeed = telem.speed }
+            if telem.altitude > peakAltitude { peakAltitude = telem.altitude }
+            if telem.gForce > peakGForce { peakGForce = telem.gForce }
+        }
+        lastRecordedProgress = OrbitalMechanics.overallProgress(at: targetTime)
     }
 
     func resetMission() {
         pauseMission()
+        HapticManager.shared.stopContinuous()
+        MissionAudioManager.shared.reset()
         missionTime = -600
         lastMilestoneIndex = -1
+        lastCountdownSecond = Int.max
+        previousPhase = .prelaunch
         challengeResults = []
         totalScore = 0
+        telemetryHistory = []
+        lastRecordedProgress = -1
+        peakSpeed = 0
+        peakAltitude = 0
+        peakGForce = 0
+        showMissionComplete = false
         updateState()
     }
 
@@ -135,9 +211,16 @@ final class MissionViewModel {
         if missionTime >= MissionConstants.totalMissionDuration {
             missionTime = MissionConstants.totalMissionDuration
             pauseMission()
+            HapticManager.shared.stopContinuous()
+            HapticManager.shared.missionComplete()
+            MissionAudioManager.shared.stop()
+            showMissionComplete = true
         }
 
         updateState()
+        updateHaptics()
+        if isAudioEnabled { MissionAudioManager.shared.update(missionTime: missionTime) }
+        recordTelemetrySnapshot()
         checkMilestones()
     }
 
@@ -145,11 +228,19 @@ final class MissionViewModel {
 
     private func updateState() {
         // Update phase
+        let newPhase: MissionPhase
         if missionTime < 0 {
-            currentPhase = .prelaunch
+            newPhase = .prelaunch
         } else {
-            currentPhase = OrbitalMechanics.currentPhase(at: missionTime)
+            newPhase = OrbitalMechanics.currentPhase(at: missionTime)
         }
+
+        if newPhase != previousPhase {
+            HapticManager.shared.phaseTransition(from: previousPhase, to: newPhase)
+            if isAudioEnabled { MissionAudioManager.shared.updatePhase(newPhase) }
+            previousPhase = newPhase
+        }
+        currentPhase = newPhase
 
         // Update telemetry
         if missionTime >= 0 {
@@ -168,6 +259,25 @@ final class MissionViewModel {
         overallProgress = OrbitalMechanics.overallProgress(at: missionTime)
     }
 
+    // MARK: - Haptic Feedback
+
+    private func updateHaptics() {
+        // Countdown ticks in the final 10 seconds before launch
+        if missionTime > -10 && missionTime < 0 {
+            let currentSecond = Int(ceil(abs(missionTime)))
+            if currentSecond != lastCountdownSecond && currentSecond >= 1 && currentSecond <= 10 {
+                lastCountdownSecond = currentSecond
+                HapticManager.shared.countdownTick(secondsRemaining: currentSecond)
+            }
+        }
+
+        // Dynamically update continuous intensity during thrust phases
+        if currentPhase == .launch || currentPhase == .translunarInjection || currentPhase == .reentry {
+            HapticManager.shared.updateContinuousIntensity(
+                gForce: telemetry.gForce, phase: currentPhase)
+        }
+    }
+
     // MARK: - Milestone Checking
 
     private func checkMilestones() {
@@ -179,6 +289,8 @@ final class MissionViewModel {
                 lastMilestoneIndex = index
                 currentMilestone = milestone
                 showMilestoneAlert = true
+                HapticManager.shared.milestoneHaptic(name: milestone.name)
+                if isAudioEnabled { MissionAudioManager.shared.onMilestone(name: milestone.name) }
 
                 // If it's an interactive milestone, pause and show challenge
                 if milestone.isInteractive {
@@ -209,6 +321,56 @@ final class MissionViewModel {
         showChallengeSheet = false
         activeChallengePhase = nil
         startMission()
+    }
+
+    // MARK: - Telemetry Recording
+
+    private func recordTelemetrySnapshot() {
+        guard missionTime >= 0 else { return }
+        let progress = overallProgress
+        guard progress - lastRecordedProgress >= recordingInterval else { return }
+        lastRecordedProgress = progress
+
+        let snapshot = TelemetrySnapshot(
+            missionTime: missionTime,
+            speed: telemetry.speed,
+            altitude: telemetry.altitude,
+            gForce: telemetry.gForce,
+            phase: currentPhase
+        )
+        telemetryHistory.append(snapshot)
+
+        if telemetry.speed > peakSpeed { peakSpeed = telemetry.speed }
+        if telemetry.altitude > peakAltitude { peakAltitude = telemetry.altitude }
+        if telemetry.gForce > peakGForce { peakGForce = telemetry.gForce }
+    }
+
+    // MARK: - Mission Stats
+
+    var missionDurationFormatted: String {
+        let totalSeconds = MissionConstants.totalMissionDuration
+        let days = Int(totalSeconds) / 86400
+        let hours = (Int(totalSeconds) % 86400) / 3600
+        return "\(days) days, \(hours) hours"
+    }
+
+    var averageChallengeScore: Double {
+        guard !challengeResults.isEmpty else { return 0 }
+        return challengeResults.reduce(0.0) { $0 + $1.score } / Double(challengeResults.count)
+    }
+
+    var challengesPassed: Int {
+        challengeResults.filter(\.passed).count
+    }
+
+    var missionRating: String {
+        let avg = averageChallengeScore
+        if challengeResults.isEmpty { return "Unrated" }
+        if avg >= 90 { return "Outstanding" }
+        if avg >= 75 { return "Excellent" }
+        if avg >= 60 { return "Good" }
+        if avg >= 40 { return "Satisfactory" }
+        return "Needs Improvement"
     }
 
     // MARK: - Convenience

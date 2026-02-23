@@ -12,20 +12,21 @@ struct MissionTimelineView: View {
     @Bindable var viewModel: MissionViewModel
     @State private var expandedPhase: MissionPhase? = nil
     @Environment(AccessibilitySettings.self) private var a11y
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    private var isWide: Bool { sizeClass == .regular }
 
     var body: some View {
         ZStack {
-            // Background
             Color(red: 0.02, green: 0.02, blue: 0.08)
                 .ignoresSafeArea()
 
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 0) {
-                        // Header
-                        VStack(spacing: 8) {
+                        VStack(spacing: isWide ? 12 : 8) {
                             Text("MISSION TIMELINE")
-                                .font(.system(size: a11y.scaled(12), weight: .bold, design: .monospaced))
+                                .font(.system(size: a11y.scaled(isWide ? 14 : 12), weight: .bold, design: .monospaced))
                                 .foregroundStyle(.white.opacity(a11y.secondaryTextOpacity))
                                 .tracking(4)
 
@@ -36,13 +37,12 @@ struct MissionTimelineView: View {
                             )
 
                             Text("Total Duration: ~10 days")
-                                .font(.system(size: 11))
+                                .font(.system(size: isWide ? 13 : 11))
                                 .foregroundStyle(.white.opacity(0.4))
                         }
-                        .padding(.top, 16)
-                        .padding(.bottom, 24)
+                        .padding(.top, isWide ? 28 : 16)
+                        .padding(.bottom, isWide ? 32 : 24)
 
-                        // Timeline phases
                         ForEach(MissionPhase.allCases) { phase in
                             TimelinePhaseCard(
                                 phase: phase,
@@ -55,7 +55,6 @@ struct MissionTimelineView: View {
                             .id(phase)
                         }
 
-                        // Score summary
                         if !viewModel.challengeResults.isEmpty {
                             ScoreSummaryCard(results: viewModel.challengeResults)
                                 .padding(.horizontal, 16)
@@ -64,6 +63,8 @@ struct MissionTimelineView: View {
 
                         Spacer(minLength: 100)
                     }
+                    .frame(maxWidth: isWide ? 720 : .infinity)
+                    .frame(maxWidth: .infinity)
                 }
                 .onChange(of: viewModel.currentPhase) { _, newPhase in
                     if a11y.reduceMotion {

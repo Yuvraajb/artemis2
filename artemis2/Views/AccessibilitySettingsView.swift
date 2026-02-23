@@ -10,30 +10,26 @@ import SwiftUI
 
 struct AccessibilitySettingsView: View {
     @Environment(AccessibilitySettings.self) private var a11y
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    private var isWide: Bool { sizeClass == .regular }
 
     var body: some View {
         ZStack {
-            // Background
             Color(red: 0.02, green: 0.02, blue: 0.08)
                 .ignoresSafeArea()
 
             ScrollView {
-                VStack(spacing: 20) {
-                    // Header
+                VStack(spacing: isWide ? 24 : 20) {
                     settingsHeader
-
-                    // Settings toggles
                     settingsToggles
-
-                    // Live preview
                     livePreviewSection
-
-                    // Info footer
                     infoFooter
-
                     Spacer(minLength: 100)
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, isWide ? 24 : 16)
+                .frame(maxWidth: isWide ? 640 : .infinity)
+                .frame(maxWidth: .infinity)
             }
         }
     }
