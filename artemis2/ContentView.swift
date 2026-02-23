@@ -15,53 +15,127 @@ struct ContentView: View {
     @State private var a11ySettings = AccessibilitySettings()
     @State private var selectedTab: AppTab = .missionControl
     @State private var showLaunchScreen = true
-    
+    @AppStorage("hasCompletedOnboarding_v2") private var hasCompletedOnboarding = false
+    @State private var showCameraPan = false
+    @State private var onboardingStep: OnboardingStep? = nil
+
     var body: some View {
         ZStack {
             if showLaunchScreen {
                 LaunchScreenView {
-                    if a11ySettings.reduceMotion {
-                        showLaunchScreen = false
+                    if hasCompletedOnboarding {
+                        dismissLaunchScreen()
                     } else {
-                        withAnimation(.easeInOut(duration: 0.8)) {
-                            showLaunchScreen = false
-                        }
+                        showCameraPan = true
+                        dismissLaunchScreen()
+                    }
+                }
+                .transition(a11ySettings.reduceMotion ? .identity : .opacity)
+            } else if showCameraPan {
+                OnboardingCameraPanView(viewModel: viewModel) {
+                    withAnimation(.easeInOut(duration: 0.6)) {
+                        showCameraPan = false
+                        onboardingStep = .orbitalView
                     }
                 }
                 .transition(a11ySettings.reduceMotion ? .identity : .opacity)
             } else {
-                mainContent
+                mainContent(onboardingStep: onboardingStep)
                     .transition(a11ySettings.reduceMotion ? .identity : .opacity)
             }
         }
         .environment(a11ySettings)
         .preferredColorScheme(.dark)
+        .onChange(of: onboardingStep) { _, newStep in
+            if let step = newStep, selectedTab != step.tab {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    selectedTab = step.tab
+                }
+            }
+        }
     }
 
-    private var mainContent: some View {
+    private func dismissLaunchScreen() {
+        if a11ySettings.reduceMotion {
+            showLaunchScreen = false
+        } else {
+            withAnimation(.easeInOut(duration: 0.8)) {
+                showLaunchScreen = false
+            }
+        }
+    }
+
+    private func advanceOnboarding() {
+        guard let current = onboardingStep else { return }
+        let allSteps = OnboardingStep.allCases
+        if let idx = allSteps.firstIndex(of: current), idx + 1 < allSteps.count {
+            withAnimation(.easeInOut(duration: 0.4)) {
+                onboardingStep = allSteps[idx + 1]
+            }
+        } else {
+            finishOnboarding()
+        }
+    }
+
+    private func finishOnboarding() {
+        withAnimation(.easeOut(duration: 0.4)) {
+            onboardingStep = nil
+        }
+        hasCompletedOnboarding = true
+    }
+
+    @ViewBuilder
+    private func mainContent(onboardingStep: OnboardingStep?) -> some View {
         TabView(selection: $selectedTab) {
-            MissionControlView(viewModel: viewModel)
-                .tabItem {
-                    Label("Mission", systemImage: "gauge.with.dots.needle.33percent")
-                }
+            MissionControlView(viewModel: viewModel, onboardingStep: onboardingStep,
+                               onNext: { advanceOnboarding() }, onSkip: { finishOnboarding() })
+                .tabItem { Label("Mission", systemImage: "gauge.with.dots.needle.33percent") }
                 .tag(AppTab.missionControl)
 
             MissionTimelineView(viewModel: viewModel)
-                .tabItem {
-                    Label("Timeline", systemImage: "timeline.selection")
+                .overlay(alignment: .topTrailing) {
+                    if onboardingStep == .timeline {
+                        CoachMarkCard(
+                            title: OnboardingStep.timeline.title,
+                            message: OnboardingStep.timeline.message,
+                            icon: OnboardingStep.timeline.icon,
+                            step: OnboardingStep.timeline.rawValue,
+                            totalSteps: OnboardingStep.count,
+                            isLast: false,
+                            onNext: { advanceOnboarding() },
+                            onSkip: { finishOnboarding() }
+                        )
+                        .frame(maxWidth: 260)
+                        .padding(12)
+                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                    }
                 }
+                .tabItem { Label("Timeline", systemImage: "timeline.selection") }
                 .tag(AppTab.timeline)
 
             CrewModuleView(viewModel: viewModel)
-                .tabItem {
-                    Label("Crew", systemImage: "person.3.fill")
+                .overlay(alignment: .topTrailing) {
+                    if onboardingStep == .crew {
+                        CoachMarkCard(
+                            title: OnboardingStep.crew.title,
+                            message: OnboardingStep.crew.message,
+                            icon: OnboardingStep.crew.icon,
+                            step: OnboardingStep.crew.rawValue,
+                            totalSteps: OnboardingStep.count,
+                            isLast: true,
+                            onNext: { finishOnboarding() },
+                            onSkip: { finishOnboarding() }
+                        )
+                        .frame(maxWidth: 260)
+                        .padding(12)
+                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                    }
                 }
+                .tabItem { Label("Crew", systemImage: "person.3.fill") }
                 .tag(AppTab.crew)
 
             AccessibilitySettingsView()
-                .tabItem {
-                    Label("Settings", systemImage: "gearshape.fill")
-                }
+                .tabItem { Label("Settings", systemImage: "gearshape.fill") }
                 .tag(AppTab.settings)
         }
         .tint(.cyan)

@@ -36,9 +36,14 @@ struct OrbitSceneView: UIViewRepresentable {
     }
 
     func updateUIView(_ scnView: SCNView, context: Context) {
-        context.coordinator.updateSpacecraftPosition(viewModel.spacecraftPosition)
-        context.coordinator.updatePhase(viewModel.currentPhase)
-        context.coordinator.updateCamera(for: viewModel)
+        scnView.allowsCameraControl = !viewModel.isOnboarding
+        if viewModel.isOnboarding {
+            context.coordinator.updateOnboardingCamera(progress: viewModel.onboardingCameraProgress)
+        } else {
+            context.coordinator.updateSpacecraftPosition(viewModel.spacecraftPosition)
+            context.coordinator.updatePhase(viewModel.currentPhase)
+            context.coordinator.updateCamera(for: viewModel)
+        }
     }
 
     func makeCoordinator() -> OrbitSceneCoordinator {
@@ -399,6 +404,30 @@ class OrbitSceneCoordinator {
             glow.geometry?.firstMaterial?.transparency = isThrusting ? 1.0 : 0.0
         }
         currentPhase = phase
+    }
+
+    /// Onboarding: scripted pan from behind Earth to the Moon. Progress 0...1.
+    func updateOnboardingCamera(progress: Double) {
+        let t = Self.smoothstep(progress)
+        let startPos = SCNVector3(0, 1, -5)
+        let endPos = SCNVector3(5, 2, 3)
+        let startLook = SCNVector3(0, 0, 0)
+        let endLook = SCNVector3(10, 0, 0)
+        cameraNode.position = Self.lerp(startPos, endPos, t)
+        cameraNode.look(at: Self.lerp(startLook, endLook, t))
+    }
+
+    private static func smoothstep(_ x: Double) -> Double {
+        let t = max(0, min(1, x))
+        return t * t * (3 - 2 * t)
+    }
+
+    private static func lerp(_ a: SCNVector3, _ b: SCNVector3, _ t: Double) -> SCNVector3 {
+        let T = Float(t)
+        let x = a.x + (b.x - a.x) * T
+        let y = a.y + (b.y - a.y) * T
+        let z = a.z + (b.z - a.z) * T
+        return SCNVector3(x, y, z)
     }
 
     func updateCamera(for viewModel: MissionViewModel) {

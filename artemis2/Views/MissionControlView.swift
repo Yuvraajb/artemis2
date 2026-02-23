@@ -10,9 +10,19 @@ import SwiftUI
 
 struct MissionControlView: View {
     @Bindable var viewModel: MissionViewModel
+    var onboardingStep: OnboardingStep? = nil
+    var onNext: (() -> Void)? = nil
+    var onSkip: (() -> Void)? = nil
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var isWide: Bool { sizeClass == .regular }
+
+    private var showTelemetry: Bool {
+        onboardingStep == nil || (onboardingStep?.rawValue ?? 0) >= OnboardingStep.telemetry.rawValue
+    }
+    private var showTimeControls: Bool {
+        onboardingStep == nil || (onboardingStep?.rawValue ?? 0) >= OnboardingStep.timeControls.rawValue
+    }
 
     var body: some View {
         ZStack {
@@ -34,6 +44,7 @@ struct MissionControlView: View {
                 iPhoneLayout
             }
         }
+        .animation(.easeInOut(duration: 0.4), value: onboardingStep)
         .sheet(isPresented: $viewModel.showChallengeSheet) {
             if let phase = viewModel.activeChallengePhase {
                 ChallengeView(viewModel: viewModel, phase: phase)
@@ -99,36 +110,87 @@ struct MissionControlView: View {
                     RoundedRectangle(cornerRadius: 16)
                         .stroke(Color.white.opacity(0.06), lineWidth: 1)
                 )
+                .overlay(alignment: .bottomTrailing) {
+                    if onboardingStep == .orbitalView, let next = onNext, let skip = onSkip {
+                        CoachMarkCard(
+                            title: OnboardingStep.orbitalView.title,
+                            message: OnboardingStep.orbitalView.message,
+                            icon: OnboardingStep.orbitalView.icon,
+                            step: OnboardingStep.orbitalView.rawValue,
+                            totalSteps: OnboardingStep.count,
+                            isLast: false, onNext: next, onSkip: skip
+                        )
+                        .frame(maxWidth: 260)
+                        .padding(12)
+                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                    }
+                }
                 .padding(.leading, 16)
                 .padding(.trailing, 8)
 
                 // Right panel: data & charts
-                ScrollView {
-                    VStack(spacing: 12) {
-                        MissionProgressBar(viewModel: viewModel)
+                if showTelemetry {
+                    ScrollView {
+                        VStack(spacing: 12) {
+                            MissionProgressBar(viewModel: viewModel)
 
-                        TelemetryDashboard(viewModel: viewModel)
+                            TelemetryDashboard(viewModel: viewModel)
+                                .overlay(alignment: .topTrailing) {
+                                    if onboardingStep == .telemetry, let next = onNext, let skip = onSkip {
+                                        CoachMarkCard(
+                                            title: OnboardingStep.telemetry.title,
+                                            message: OnboardingStep.telemetry.message,
+                                            icon: OnboardingStep.telemetry.icon,
+                                            step: OnboardingStep.telemetry.rawValue,
+                                            totalSteps: OnboardingStep.count,
+                                            isLast: false, onNext: next, onSkip: skip
+                                        )
+                                        .frame(maxWidth: 260)
+                                        .padding(6)
+                                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                                    }
+                                }
 
-                        TelemetryChartView(viewModel: viewModel)
+                            TelemetryChartView(viewModel: viewModel)
 
-                        // Phase description card on iPad
-                        iPadPhaseInfoCard
+                            iPadPhaseInfoCard
+                        }
+                        .padding(.horizontal, 4)
+                        .padding(.top, 12)
+                        .padding(.bottom, 8)
                     }
-                    .padding(.horizontal, 4)
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
+                    .frame(width: 360)
+                    .padding(.trailing, 16)
+                    .padding(.leading, 8)
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
                 }
-                .frame(width: 360)
-                .padding(.trailing, 16)
-                .padding(.leading, 8)
             }
             .padding(.top, 8)
 
             // Time controls spanning full width
-            TimeControlPanel(viewModel: viewModel)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 10)
-                .padding(.top, 4)
+            if showTimeControls {
+                TimeControlPanel(viewModel: viewModel)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 10)
+                    .padding(.top, 4)
+                    .overlay(alignment: .topTrailing) {
+                        if onboardingStep == .timeControls, let next = onNext, let skip = onSkip {
+                            CoachMarkCard(
+                                title: OnboardingStep.timeControls.title,
+                                message: OnboardingStep.timeControls.message,
+                                icon: OnboardingStep.timeControls.icon,
+                                step: OnboardingStep.timeControls.rawValue,
+                                totalSteps: OnboardingStep.count,
+                                isLast: false, onNext: next, onSkip: skip
+                            )
+                            .frame(maxWidth: 260)
+                            .offset(y: -70)
+                            .padding(.trailing, 12)
+                            .transition(.opacity.combined(with: .move(edge: .trailing)))
+                        }
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
         }
     }
 
@@ -174,6 +236,7 @@ struct MissionControlView: View {
 
     private var iPhoneLayout: some View {
         VStack(spacing: 0) {
+            // 3D orbital view — always visible
             ZStack(alignment: .topLeading) {
                 GeometryReader { geo in
                     OrbitSceneView(viewModel: viewModel)
@@ -211,24 +274,82 @@ struct MissionControlView: View {
                     )
                 }
             }
-
-            ScrollView {
-                VStack(spacing: 8) {
-                    MissionProgressBar(viewModel: viewModel)
-                        .padding(.horizontal, 16)
-                    TelemetryDashboard(viewModel: viewModel)
-                        .padding(.horizontal, 12)
-                    TelemetryChartView(viewModel: viewModel)
-                        .padding(.horizontal, 12)
+            .overlay(alignment: .bottomTrailing) {
+                if onboardingStep == .orbitalView, let next = onNext, let skip = onSkip {
+                    // #region agent log
+                    let _ = _dlog("MissionControlView:overlay", "orbitalView card VISIBLE", hyp: "H5")
+                    // #endregion
+                    CoachMarkCard(
+                        title: OnboardingStep.orbitalView.title,
+                        message: OnboardingStep.orbitalView.message,
+                        icon: OnboardingStep.orbitalView.icon,
+                        step: OnboardingStep.orbitalView.rawValue,
+                        totalSteps: OnboardingStep.count,
+                        isLast: false, onNext: next, onSkip: skip
+                    )
+                    .frame(maxWidth: 240)
+                    .padding(10)
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
                 }
-                .padding(.top, 8)
-                .padding(.bottom, 4)
             }
 
-            TimeControlPanel(viewModel: viewModel)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
+            // Telemetry — revealed at step 1
+            if showTelemetry {
+                ScrollView {
+                    VStack(spacing: 8) {
+                        MissionProgressBar(viewModel: viewModel)
+                            .padding(.horizontal, 16)
+                        TelemetryDashboard(viewModel: viewModel)
+                            .padding(.horizontal, 12)
+                            .overlay(alignment: .topTrailing) {
+                                if onboardingStep == .telemetry, let next = onNext, let skip = onSkip {
+                                    CoachMarkCard(
+                                        title: OnboardingStep.telemetry.title,
+                                        message: OnboardingStep.telemetry.message,
+                                        icon: OnboardingStep.telemetry.icon,
+                                        step: OnboardingStep.telemetry.rawValue,
+                                        totalSteps: OnboardingStep.count,
+                                        isLast: false, onNext: next, onSkip: skip
+                                    )
+                                    .frame(maxWidth: 240)
+                                    .padding(6)
+                                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+                                }
+                            }
+                        TelemetryChartView(viewModel: viewModel)
+                            .padding(.horizontal, 12)
+                    }
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
+                }
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+
+            // Time controls — revealed at step 2
+            if showTimeControls {
+                TimeControlPanel(viewModel: viewModel)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+                    .overlay(alignment: .topTrailing) {
+                        if onboardingStep == .timeControls, let next = onNext, let skip = onSkip {
+                            CoachMarkCard(
+                                title: OnboardingStep.timeControls.title,
+                                message: OnboardingStep.timeControls.message,
+                                icon: OnboardingStep.timeControls.icon,
+                                step: OnboardingStep.timeControls.rawValue,
+                                totalSteps: OnboardingStep.count,
+                                isLast: false, onNext: next, onSkip: skip
+                            )
+                            .frame(maxWidth: 240)
+                            .offset(y: -70)
+                            .padding(.trailing, 6)
+                            .transition(.opacity.combined(with: .move(edge: .trailing)))
+                        }
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
         }
+        .animation(.easeInOut(duration: 0.5), value: onboardingStep)
     }
 }
 

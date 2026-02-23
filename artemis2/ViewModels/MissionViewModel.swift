@@ -30,6 +30,11 @@ final class MissionViewModel {
 
     // MARK: - View State
 
+    /// When true, the app is showing the onboarding flow (camera pan + overlay cards).
+    var isOnboarding: Bool = false
+    /// 0...1 progress for the onboarding camera pan (behind Earth → pan to Moon).
+    var onboardingCameraProgress: Double = 0
+
     var viewMode: ViewMode = .external
     var showChallengeSheet: Bool = false
     var activeChallengePhase: MissionPhase? = nil
@@ -98,27 +103,16 @@ final class MissionViewModel {
         isRunning = true
         startTimer()
         HapticManager.shared.resumeContinuous()
-        if isAudioEnabled {
-            MissionAudioManager.shared.startAmbient(for: currentPhase)
-        }
     }
 
     func pauseMission() {
         isRunning = false
         stopTimer()
         HapticManager.shared.pauseContinuous()
-        if isAudioEnabled {
-            MissionAudioManager.shared.pauseAmbient()
-        }
     }
 
     func toggleAudio() {
         isAudioEnabled.toggle()
-        if isAudioEnabled {
-            MissionAudioManager.shared.startAmbient(for: currentPhase)
-        } else {
-            MissionAudioManager.shared.stop()
-        }
     }
 
     func togglePlayPause() {
@@ -135,7 +129,6 @@ final class MissionViewModel {
 
     func skipToPhase(_ phase: MissionPhase) {
         HapticManager.shared.stopContinuous()
-        MissionAudioManager.shared.skipTo(missionTime: phase.startTime + 1)
         backfillTelemetryHistory(upTo: phase.startTime + 1)
         missionTime = phase.startTime + 1
         previousPhase = phase
@@ -171,7 +164,6 @@ final class MissionViewModel {
     func resetMission() {
         pauseMission()
         HapticManager.shared.stopContinuous()
-        MissionAudioManager.shared.reset()
         missionTime = -600
         lastMilestoneIndex = -1
         lastCountdownSecond = Int.max
@@ -213,13 +205,11 @@ final class MissionViewModel {
             pauseMission()
             HapticManager.shared.stopContinuous()
             HapticManager.shared.missionComplete()
-            MissionAudioManager.shared.stop()
             showMissionComplete = true
         }
 
         updateState()
         updateHaptics()
-        if isAudioEnabled { MissionAudioManager.shared.update(missionTime: missionTime) }
         recordTelemetrySnapshot()
         checkMilestones()
     }
@@ -237,7 +227,6 @@ final class MissionViewModel {
 
         if newPhase != previousPhase {
             HapticManager.shared.phaseTransition(from: previousPhase, to: newPhase)
-            if isAudioEnabled { MissionAudioManager.shared.updatePhase(newPhase) }
             previousPhase = newPhase
         }
         currentPhase = newPhase
@@ -290,7 +279,6 @@ final class MissionViewModel {
                 currentMilestone = milestone
                 showMilestoneAlert = true
                 HapticManager.shared.milestoneHaptic(name: milestone.name)
-                if isAudioEnabled { MissionAudioManager.shared.onMilestone(name: milestone.name) }
 
                 // If it's an interactive milestone, pause and show challenge
                 if milestone.isInteractive {
