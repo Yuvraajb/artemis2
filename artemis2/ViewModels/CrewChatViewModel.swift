@@ -92,39 +92,45 @@ final class CrewChatViewModel {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !isGenerating else { return }
 
-        // Add user message
         let userMessage = ChatMessage(role: .user, text: text, timestamp: Date())
         messages.append(userMessage)
         inputText = ""
         isGenerating = true
         errorMessage = nil
 
-        // Create a placeholder for the astronaut response
         let placeholderIndex = messages.count
         messages.append(ChatMessage(role: .astronaut, text: "", timestamp: Date()))
 
-        do {
-            guard let session = session else {
-                throw CrewChatError.sessionUnavailable
-            }
-
-            // Use streaming for a responsive typing effect
-            let stream = session.streamResponse(to: text)
-            for try await snapshot in stream {
-                if placeholderIndex < messages.count {
-                    messages[placeholderIndex].text = snapshot.content
+        if isModelAvailable, let session = session {
+            do {
+                let stream = session.streamResponse(to: text)
+                var isFirstToken = true
+                for try await snapshot in stream {
+                    if placeholderIndex < messages.count {
+                        messages[placeholderIndex].text = snapshot.content
+                        if isFirstToken {
+                            isFirstToken = false
+                            HapticManager.shared.messageReceived()
+                        }
+                    }
                 }
-            }
 
-            // If response ended up empty, show a fallback
-            if placeholderIndex < messages.count && messages[placeholderIndex].text.isEmpty {
-                messages[placeholderIndex].text = "I'm having trouble responding right now. Could you try asking again?"
+                if placeholderIndex < messages.count && messages[placeholderIndex].text.isEmpty {
+                    messages[placeholderIndex].text = fallbackResponse(for: text)
+                }
+            } catch {
+                if placeholderIndex < messages.count {
+                    messages[placeholderIndex].text = fallbackResponse(for: text)
+                }
+                errorMessage = error.localizedDescription
             }
-        } catch {
+        } else {
+            let response = fallbackResponse(for: text)
+            try? await Task.sleep(for: .milliseconds(Int.random(in: 400...900)))
             if placeholderIndex < messages.count {
-                messages[placeholderIndex].text = "Sorry, I couldn't process that. Please try again."
+                messages[placeholderIndex].text = response
+                HapticManager.shared.messageReceived()
             }
-            errorMessage = error.localizedDescription
         }
 
         isGenerating = false
@@ -257,6 +263,144 @@ final class CrewChatViewModel {
             return "Hello! Jeremy Hansen here, representing the Canadian Space Agency. Being the first Canadian headed to the Moon is something I still pinch myself about. What would you like to chat about?"
         default:
             return "Hello! Welcome to the Artemis II mission. Feel free to ask me anything."
+        }
+    }
+
+    // MARK: - Fallback Responses (used when Apple Intelligence is unavailable)
+
+    private var fallbackIndex = 0
+
+    private func fallbackResponse(for input: String) -> String {
+        let lower = input.lowercased()
+
+        if let topicMatch = topicResponses.first(where: { keywords, _ in
+            keywords.contains(where: { lower.contains($0) })
+        }) {
+            return topicMatch.1.randomElement() ?? generalFallbacks.randomElement()!
+        }
+
+        let response = generalFallbacks[fallbackIndex % generalFallbacks.count]
+        fallbackIndex += 1
+        return response
+    }
+
+    private var topicResponses: [([String], [String])] {
+        let name = crewMember.name
+        switch name {
+        case "Reid Wiseman":
+            return [
+                (["mission", "artemis", "orion"], [
+                    "Artemis II is the first crewed mission to the Moon in over 50 years. We'll fly a free-return trajectory — looping around the far side of the Moon about 100 km above the surface before heading home. The whole flight is roughly 10 days.",
+                    "Our SLS rocket produces 8.8 million pounds of thrust at liftoff — that's 15% more than the Saturn V. From my commander's seat, I can tell you the engineering that went into this vehicle is extraordinary.",
+                ]),
+                (["navy", "pilot", "fly", "career", "background"], [
+                    "I flew F/A-18 Super Hornets off aircraft carriers for the Navy before joining NASA. There's actually a lot of overlap between carrier landings and spacecraft reentry — both require precision under extreme conditions and trusting your instruments.",
+                    "I was selected as an astronaut in 2009 and spent 165 days on the ISS during Expedition 40/41. That experience taught me more about long-duration spaceflight than any simulator could.",
+                ]),
+                (["crew", "team", "victor", "christina", "jeremy"], [
+                    "I couldn't ask for a better crew. Victor's test pilot skills are razor sharp, Christina brings unmatched endurance experience from her 328-day mission, and Jeremy is one of the most capable mission specialists I've worked with. We trust each other completely.",
+                ]),
+                (["sls", "rocket", "launch"], [
+                    "The Space Launch System is the most powerful rocket NASA has ever built. At liftoff, those twin solid rocket boosters and four RS-25 engines produce 8.8 million pounds of thrust. The vibration and sound during ascent are unlike anything else — even compared to my fighter jet days.",
+                ]),
+                (["moon", "lunar", "far side"], [
+                    "We'll fly about 100 km above the lunar far side — farther from Earth than any human has traveled. The far side has no direct radio link to Earth, so we'll be truly on our own for a portion of the flyby. It's a profound thought.",
+                ]),
+            ]
+        case "Victor Glover":
+            return [
+                (["pilot", "fly", "controls", "orion"], [
+                    "As Orion's pilot, I manage the spacecraft's propulsion and navigation systems. The cockpit interfaces are light-years ahead of what we had on Crew Dragon — Orion was built from the ground up for deep space operations.",
+                    "Flying to the Moon requires a completely different mindset than low Earth orbit. The navigation has to account for three gravitational bodies — Earth, Moon, and Sun — and our trajectory tolerances are measured in fractions of a degree.",
+                ]),
+                (["history", "first", "african american", "represent"], [
+                    "Being the first African American on a lunar mission is something I carry with great pride and responsibility. I think about all the people who made this possible — from the Hidden Figures mathematicians to every engineer and mentor along the way. I want every kid to see themselves in this crew.",
+                ]),
+                (["crew dragon", "spacex", "iss", "spacewalk"], [
+                    "On SpaceX Crew-1, I spent 168 days aboard the ISS and conducted four spacewalks. Each one was incredible — floating outside with Earth below you, working in the vacuum of space with just a suit between you and the void. That experience prepared me for the challenges of Artemis II.",
+                ]),
+                (["mission", "artemis", "moon"], [
+                    "Artemis II proves that humans can operate in deep space with the Orion spacecraft. Everything we validate on this flight — life support, navigation, communications — paves the way for Artemis III to actually land astronauts on the lunar surface.",
+                ]),
+                (["reentry", "landing", "return"], [
+                    "Reentry is the most intense phase. We'll be coming back at about 40,000 km/h — that's 11 km/s. Orion uses a skip reentry technique where it dips into the atmosphere, skips back up, then comes down again. It reduces the G-forces on the crew and allows a more precise splashdown.",
+                ]),
+            ]
+        case "Christina Koch":
+            return [
+                (["record", "iss", "long", "328", "duration"], [
+                    "I spent 328 consecutive days aboard the ISS — the longest single spaceflight by a woman. Living in microgravity that long teaches you to adapt in ways you never imagined. Your body changes, your perspective changes. I learned that humans are incredibly resilient.",
+                    "After 328 days in space, I can tell you the hardest part isn't the science or the procedures — it's the small things. Missing the feeling of rain, cooking a meal, hugging someone. But the view of Earth from orbit makes it all worthwhile.",
+                ]),
+                (["spacewalk", "eva", "jessica", "meir"], [
+                    "The first all-female spacewalk with Jessica Meir in October 2019 was a milestone I'm incredibly proud of. What made it special wasn't just the history — it was that it felt normal. Two qualified astronauts doing the job, and that normality is the real progress.",
+                ]),
+                (["science", "experiment", "research"], [
+                    "On Artemis II, I manage mission science and experiments. We're testing how Orion's systems perform in the deep space environment — radiation measurements, life support efficiency, and communication delays. Every data point we collect makes future Moon and Mars missions safer.",
+                ]),
+                (["inspire", "stem", "women", "girl"], [
+                    "I got into engineering because someone showed me it was possible. That's why representation matters — when a young girl sees a woman flying to the Moon, it expands what she believes she can do. I take that responsibility seriously and try to connect with students whenever I can.",
+                ]),
+                (["mission", "artemis", "moon"], [
+                    "Artemis II is about proving we can send humans safely to deep space and bring them home. My role as Mission Specialist means I'm managing spacecraft systems, experiments, and supporting the crew throughout the flight. Every system has backups, and every procedure has been rehearsed hundreds of times.",
+                ]),
+            ]
+        case "Jeremy Hansen":
+            return [
+                (["canada", "canadian", "csa", "first"], [
+                    "Being the first Canadian to fly to the Moon is an honor that belongs to all of Canada. Our country has been a space partner since the Canadarm, and this mission represents decades of Canadian expertise in robotics, science, and astronaut training.",
+                    "I was selected by the Canadian Space Agency in 2009. Canada has a long legacy in space — from the Canadarm to Chris Hadfield commanding the ISS. Being part of Artemis II continues that tradition on a scale I never imagined.",
+                ]),
+                (["fighter", "pilot", "military", "cf-18", "air force"], [
+                    "I flew CF-18 Hornets for the Royal Canadian Air Force, including combat missions. Fighter aviation teaches you to make critical decisions under extreme pressure with incomplete information — exactly the kind of skills you need when something unexpected happens at 400,000 km from Earth.",
+                ]),
+                (["international", "partner", "artemis", "accords"], [
+                    "What makes Artemis special isn't just the technology — it's the international partnership. NASA, CSA, ESA, JAXA, and other agencies are working together. Space exploration brings out the best in international cooperation, and I'm proud to represent that partnership.",
+                ]),
+                (["mission", "moon", "role"], [
+                    "My role on Artemis II includes supporting mission operations, monitoring spacecraft systems, and planning for future extravehicular activities. I work closely with the entire crew to make sure every phase of the mission runs smoothly.",
+                ]),
+                (["train", "preparation", "ready"], [
+                    "We've trained in simulators, underwater in the Neutral Buoyancy Lab, survival training in case of off-nominal landing, and hundreds of hours of classroom study. The team at NASA and CSA has prepared us for every scenario we can imagine — and quite a few we hope never happen.",
+                ]),
+            ]
+        default:
+            return []
+        }
+    }
+
+    private var generalFallbacks: [String] {
+        switch crewMember.name {
+        case "Reid Wiseman":
+            return [
+                "That's a great question. From the commander's perspective, every decision on this mission comes down to crew safety first, mission success second. The Orion spacecraft gives us capabilities we've never had before in deep space.",
+                "You know, one thing I love about this mission is how it connects generations. The Apollo astronauts paved the way, and now we're picking up where they left off — with better technology and a bigger dream.",
+                "Being in the commander's seat is both humbling and exhilarating. Every system on Orion has been tested extensively, but there's always that moment at T-minus 10 when you realize — this is real.",
+                "The view of Earth getting smaller as we head toward the Moon is something I think about often. It's going to put everything in perspective. The Apollo crews described it as life-changing, and I believe it.",
+            ]
+        case "Victor Glover":
+            return [
+                "From a pilot's perspective, every detail matters. The margins in deep space are thinner than in low Earth orbit — there's no quick return if something goes wrong. That's what makes the engineering so impressive.",
+                "I think about the kids watching this mission. When I was young, I looked up and dreamed about space. Now I'm here, piloting a spacecraft to the Moon. Dreams are worth chasing.",
+                "The Orion spacecraft handles differently than anything I've flown before. In deep space, orbital mechanics dictates everything — you can't just point and burn like a fighter jet.",
+                "One thing people don't realize about spaceflight is how much teamwork goes into every moment. There are thousands of people on the ground making this happen. We're just the ones lucky enough to ride the rocket.",
+            ]
+        case "Christina Koch":
+            return [
+                "Space has a way of reframing everything. After 328 days on the ISS, I came back with a deeper appreciation for how connected our planet is. From orbit, you don't see borders — just one beautiful, fragile world.",
+                "The science we do in space has real impacts on Earth. From medical research to materials science, the discoveries made in microgravity benefit everyone. Artemis II continues that legacy in deep space.",
+                "What I love about engineering is the creative problem-solving. Every challenge in space has a solution — you just have to find it. That mindset has served me well from the lab to the space station to Orion.",
+                "Living in space for nearly a year taught me that humans can adapt to almost anything. That gives me confidence for longer missions — to Mars and beyond. Artemis II is the next step on that journey.",
+            ]
+        case "Jeremy Hansen":
+            return [
+                "Space has a way of bringing out the best in people. The international cooperation behind Artemis is remarkable — nations that might disagree on Earth work together beautifully when it comes to exploring the cosmos.",
+                "My fighter pilot training taught me to stay calm under pressure and trust your crew. Those lessons apply directly to spaceflight. When you're 400,000 km from home, trust is everything.",
+                "Canada has contributed to space exploration for decades, from the Canadarm to scientific research. Being part of Artemis II feels like the natural next chapter of that story.",
+                "Every astronaut will tell you the same thing — the best part of the job is the view. Seeing Earth from space fundamentally changes how you think about our place in the universe.",
+            ]
+        default:
+            return ["That's interesting! I'd love to tell you more about our mission. Ask me about the spacecraft, the crew, or what it's like to fly to the Moon."]
         }
     }
 }

@@ -165,7 +165,7 @@ struct CrewMember: Identifiable {
             role: "Commander",
             agency: "NASA",
             bio: "U.S. Navy Captain and former fighter pilot. Served aboard the ISS for 165 days on Expedition 41. Selected as an astronaut in 2009, he brings extensive spaceflight and leadership experience.",
-            imageName: "person.circle.fill",
+            imageName: "reid",
             nationality: "American"
         ),
         CrewMember(
@@ -173,7 +173,7 @@ struct CrewMember: Identifiable {
             role: "Pilot",
             agency: "NASA",
             bio: "U.S. Navy Captain and test pilot. Served as pilot of SpaceX Crew-1 aboard the ISS. He will be the first person of color to fly on a lunar mission and will pilot Orion around the Moon.",
-            imageName: "person.circle.fill",
+            imageName: "victor",
             nationality: "American"
         ),
         CrewMember(
@@ -181,7 +181,7 @@ struct CrewMember: Identifiable {
             role: "Mission Specialist 1",
             agency: "NASA",
             bio: "Electrical engineer and former station chief at American Samoa Observatory. Holds the record for the longest single spaceflight by a woman (328 days on the ISS). Conducted the first all-female spacewalk.",
-            imageName: "person.circle.fill",
+            imageName: "christina",
             nationality: "American"
         ),
         CrewMember(
@@ -189,7 +189,7 @@ struct CrewMember: Identifiable {
             role: "Mission Specialist 2",
             agency: "CSA",
             bio: "Colonel in the Canadian Armed Forces and former CF-18 fighter pilot. Selected by the Canadian Space Agency in 2009. He will be the first non-American to fly on a lunar mission.",
-            imageName: "person.circle.fill",
+            imageName: "jeremy",
             nationality: "Canadian"
         )
     ]

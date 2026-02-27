@@ -11,89 +11,83 @@ import SwiftUI
 struct ChallengeView: View {
     let viewModel: MissionViewModel
     let phase: MissionPhase
-    @State private var challengeValue: Double = 0.5
+    @State private var challengeValue: Double = 0.0
     @State private var hasSubmitted: Bool = false
     @State private var result: ChallengeResult? = nil
     @State private var isAnimating: Bool = false
-    @Environment(\.dismiss) private var dismiss
     @Environment(AccessibilitySettings.self) private var a11y
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     private var isWide: Bool { sizeClass == .regular }
 
     var body: some View {
-        ZStack {
-            Color(red: 0.02, green: 0.02, blue: 0.1)
-                .ignoresSafeArea()
+        VStack(spacing: 14) {
+            challengeHeader
 
-            VStack(spacing: 20) {
-                // Header
-                challengeHeader
-
-                Spacer()
-
-                // Challenge content based on phase
-                switch phase {
-                case .translunarInjection:
-                    TLIBurnChallenge(
-                        burnValue: $challengeValue,
-                        hasSubmitted: hasSubmitted
-                    )
-                case .lunarFlyby:
-                    FlybyChallenge(
-                        altitudeValue: $challengeValue,
-                        hasSubmitted: hasSubmitted
-                    )
-                case .reentry:
-                    ReentryChallenge(
-                        angleValue: $challengeValue,
-                        hasSubmitted: hasSubmitted
-                    )
-                default:
-                    Text("No challenge for this phase")
-                        .foregroundStyle(.white.opacity(0.5))
-                }
-
-                Spacer()
-
-                // Result display
-                if let result = result {
-                    resultDisplay(result)
-                        .transition(.scale.combined(with: .opacity))
-                }
-
-                // Action buttons
-                actionButtons
+            switch phase {
+            case .translunarInjection:
+                TLIBurnChallenge(
+                    burnValue: $challengeValue,
+                    hasSubmitted: hasSubmitted
+                )
+            case .lunarFlyby:
+                FlybyChallenge(
+                    altitudeValue: $challengeValue,
+                    hasSubmitted: hasSubmitted
+                )
+            case .reentry:
+                ReentryChallenge(
+                    angleValue: $challengeValue,
+                    hasSubmitted: hasSubmitted
+                )
+            default:
+                Text("No challenge for this phase")
+                    .foregroundStyle(.white.opacity(0.5))
             }
-            .padding(isWide ? 32 : 24)
-            .frame(maxWidth: isWide ? 560 : .infinity)
-            .frame(maxWidth: .infinity)
+
+            if let result = result {
+                resultDisplay(result)
+                    .transition(.scale.combined(with: .opacity))
+            }
+
+            actionButtons
         }
+        .padding(isWide ? 24 : 18)
+        .frame(maxWidth: isWide ? 480 : 340)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(red: 0.06, green: 0.06, blue: 0.14).opacity(0.96))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(phase.color.opacity(0.3), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.6), radius: 30, y: 10)
+        )
     }
 
     // MARK: - Components
 
     private var challengeHeader: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             Image(systemName: "gamecontroller.fill")
-                .font(.system(size: 24))
+                .font(.system(size: 18))
                 .foregroundStyle(phase.color)
 
             Text("MISSION CHALLENGE")
-                .font(.system(size: 10, weight: .heavy, design: .monospaced))
+                .font(.system(size: 9, weight: .heavy, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.5))
-                .tracking(3)
+                .tracking(2)
 
             Text(phase.name)
-                .font(.system(size: 22, weight: .bold))
+                .font(.system(size: 17, weight: .bold))
                 .foregroundStyle(.white)
 
             if let desc = phase.challengeDescription {
                 Text(desc)
-                    .font(.system(size: 13))
+                    .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.7))
                     .multilineTextAlignment(.center)
-                    .lineSpacing(4)
+                    .lineSpacing(3)
             }
         }
         .accessibilityElement(children: .combine)
@@ -210,14 +204,12 @@ struct ChallengeView: View {
 
     private func skip() {
         viewModel.skipChallenge()
-        dismiss()
     }
 
     private func continueAfterChallenge() {
         if let result = result {
             viewModel.submitChallengeResult(result)
         }
-        dismiss()
     }
 
     private func evaluateChallenge() -> ChallengeResult {
@@ -282,14 +274,14 @@ struct ChallengeView: View {
 struct TLIBurnChallenge: View {
     @Binding var burnValue: Double
     let hasSubmitted: Bool
+    @State private var inOptimalZone = false
 
     var body: some View {
-        VStack(spacing: 16) {
-            // Visual: Engine burn indicator
+        VStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .stroke(Color.orange.opacity(0.2), lineWidth: 8)
-                    .frame(width: 140, height: 140)
+                    .stroke(Color.orange.opacity(0.2), lineWidth: 6)
+                    .frame(width: 100, height: 100)
 
                 Circle()
                     .trim(from: 0, to: burnValue)
@@ -298,17 +290,17 @@ struct TLIBurnChallenge: View {
                             colors: [.yellow, .orange, .red],
                             center: .center
                         ),
-                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                        style: StrokeStyle(lineWidth: 6, lineCap: .round)
                     )
-                    .frame(width: 140, height: 140)
+                    .frame(width: 100, height: 100)
                     .rotationEffect(.degrees(-90))
 
                 VStack(spacing: 2) {
                     Text(String(format: "%.0f%%", burnValue * 100))
-                        .font(.system(size: 28, weight: .heavy, design: .monospaced))
+                        .font(.system(size: 22, weight: .heavy, design: .monospaced))
                         .foregroundStyle(.orange)
                     Text("BURN TIMING")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: 7, weight: .bold))
                         .foregroundStyle(.white.opacity(0.5))
                 }
             }
@@ -370,6 +362,14 @@ struct TLIBurnChallenge: View {
         }
         .padding(16)
         .glassCard()
+        .onChange(of: burnValue) { _, newValue in
+            guard !hasSubmitted else { return }
+            let nowInZone = newValue >= 0.35 && newValue <= 0.65
+            if nowInZone != inOptimalZone {
+                inOptimalZone = nowInZone
+                HapticManager.shared.zoneBoundary(enteringSafe: nowInZone)
+            }
+        }
     }
 }
 
@@ -378,6 +378,7 @@ struct TLIBurnChallenge: View {
 struct FlybyChallenge: View {
     @Binding var altitudeValue: Double
     let hasSubmitted: Bool
+    @State private var inSafeZone = false
     @Environment(AccessibilitySettings.self) private var a11y
 
     private var altitude: Double {
@@ -389,39 +390,34 @@ struct FlybyChallenge: View {
     }
 
     var body: some View {
-        VStack(spacing: 16) {
-            // Visual: Moon with altitude indicator
+        VStack(spacing: 12) {
             ZStack {
-                // Moon surface
                 Circle()
                     .fill(
                         RadialGradient(
                             colors: [Color(white: 0.7), Color(white: 0.4)],
                             center: .center,
                             startRadius: 0,
-                            endRadius: 60
+                            endRadius: 40
                         )
                     )
+                    .frame(width: 80, height: 80)
+
+                Circle()
+                    .stroke(a11y.safeColor.opacity(0.3), lineWidth: 8)
                     .frame(width: 120, height: 120)
 
-                // Safe zone ring
-                Circle()
-                    .stroke(a11y.safeColor.opacity(0.3), lineWidth: 12)
-                    .frame(width: 170, height: 170)
-
-                // Current altitude ring
-                let ring = 120 + (altitude - 60) / 80 * 80
+                let ring = 80 + (altitude - 60) / 80 * 60
                 Circle()
                     .stroke(isInSafeZone ? a11y.safeColor : a11y.dangerColor, lineWidth: 2)
                     .frame(width: ring, height: ring)
 
-                // Spacecraft dot
                 Circle()
                     .fill(isInSafeZone ? a11y.safeColor : a11y.dangerColor)
-                    .frame(width: 8, height: 8)
+                    .frame(width: 6, height: 6)
                     .offset(y: -ring / 2)
             }
-            .frame(height: 200)
+            .frame(height: 140)
 
             // Altitude readout
             HStack {
@@ -460,6 +456,15 @@ struct FlybyChallenge: View {
         }
         .padding(16)
         .glassCard()
+        .onChange(of: altitudeValue) { _, newValue in
+            guard !hasSubmitted else { return }
+            let alt = 60 + newValue * 80
+            let nowSafe = alt >= 80 && alt <= 120
+            if nowSafe != inSafeZone {
+                inSafeZone = nowSafe
+                HapticManager.shared.zoneBoundary(enteringSafe: nowSafe)
+            }
+        }
     }
 }
 
@@ -468,6 +473,7 @@ struct FlybyChallenge: View {
 struct ReentryChallenge: View {
     @Binding var angleValue: Double
     let hasSubmitted: Bool
+    @State private var inToleranceZone = false
     @Environment(AccessibilitySettings.self) private var a11y
 
     private var angle: Double {
@@ -479,15 +485,13 @@ struct ReentryChallenge: View {
     }
 
     var body: some View {
-        VStack(spacing: 16) {
-            // Visual: Reentry angle diagram
+        VStack(spacing: 12) {
             ZStack {
-                // Earth atmosphere arc
                 Path { path in
-                    path.addArc(center: CGPoint(x: 150, y: 200),
-                               radius: 160,
-                               startAngle: .degrees(200),
-                               endAngle: .degrees(340),
+                    path.addArc(center: CGPoint(x: 110, y: 140),
+                               radius: 110,
+                               startAngle: .degrees(210),
+                               endAngle: .degrees(330),
                                clockwise: false)
                 }
                 .stroke(
@@ -496,20 +500,13 @@ struct ReentryChallenge: View {
                         startPoint: .top,
                         endPoint: .bottom
                     ),
-                    lineWidth: 30
+                    lineWidth: 20
                 )
 
-                // Safe corridor
-                let safeAngleStart = -5.5
-                let safeAngleEnd = -7.5
-                let _ = safeAngleStart
-                let _ = safeAngleEnd
-
-                // Spacecraft entry line
                 let entryAngle = angle
-                let startX = 280.0
-                let startY = 40.0
-                let lineLength = 200.0
+                let startX = 200.0
+                let startY = 30.0
+                let lineLength = 140.0
                 let endX = startX + lineLength * cos(entryAngle * .pi / 180 + .pi)
                 let endY = startY - lineLength * sin(entryAngle * .pi / 180 + .pi)
 
@@ -519,14 +516,13 @@ struct ReentryChallenge: View {
                 }
                 .stroke(isInTolerance ? a11y.safeColor : a11y.dangerColor, style: StrokeStyle(lineWidth: 2, dash: [5, 3]))
 
-                // Spacecraft
                 Image(systemName: "arrowtriangle.right.fill")
-                    .font(.system(size: 16))
+                    .font(.system(size: 14))
                     .foregroundStyle(isInTolerance ? a11y.safeColor : a11y.dangerColor)
                     .position(x: startX, y: startY)
                     .rotationEffect(.degrees(180 + angle))
             }
-            .frame(height: 160)
+            .frame(height: 110)
 
             // Angle readout
             HStack {
@@ -580,6 +576,15 @@ struct ReentryChallenge: View {
         }
         .padding(16)
         .glassCard()
+        .onChange(of: angleValue) { _, newValue in
+            guard !hasSubmitted else { return }
+            let ang = -5.0 - newValue * 3.0
+            let nowTolerant = ang >= -7.5 && ang <= -5.5
+            if nowTolerant != inToleranceZone {
+                inToleranceZone = nowTolerant
+                HapticManager.shared.zoneBoundary(enteringSafe: nowTolerant)
+            }
+        }
     }
 }
 

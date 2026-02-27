@@ -80,11 +80,13 @@ struct MissionTimelineView: View {
     }
 
     private func togglePhase(_ phase: MissionPhase) {
+        let willExpand = expandedPhase != phase
+        HapticManager.shared.timelineToggle(expanded: willExpand)
         if a11y.reduceMotion {
-            expandedPhase = expandedPhase == phase ? nil : phase
+            expandedPhase = willExpand ? phase : nil
         } else {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                expandedPhase = expandedPhase == phase ? nil : phase
+                expandedPhase = willExpand ? phase : nil
             }
         }
     }
@@ -333,7 +335,10 @@ struct TimelinePhaseCard: View {
     @ViewBuilder
     private var skipButton: some View {
         if status == .upcoming {
-            Button(action: onSkip) {
+            Button(action: {
+                HapticManager.shared.skipForward()
+                onSkip()
+            }) {
                 HStack {
                     Image(systemName: "forward.fill")
                         .font(.system(size: 10))

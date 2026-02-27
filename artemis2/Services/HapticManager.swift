@@ -340,6 +340,228 @@ final class HapticManager {
         }
     }
 
+    // MARK: - Prologue Haptics
+
+    private var heartbeatTimer: Timer?
+
+    /// Start a slow heartbeat: thump-thump ... thump-thump at ~60 BPM.
+    func startHeartbeat() {
+        guard supportsHaptics else { return }
+        stopHeartbeat()
+        playHeartbeatPair(intensity: 0.25)
+        heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 1.6, repeats: true) { [weak self] _ in
+            self?.playHeartbeatPair(intensity: 0.25)
+        }
+    }
+
+    func stopHeartbeat() {
+        heartbeatTimer?.invalidate()
+        heartbeatTimer = nil
+    }
+
+    private func playHeartbeatPair(intensity: Float) {
+        playTransient(intensity: intensity, sharpness: 0.08)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) {
+            self.playTransient(intensity: intensity * 1.4, sharpness: 0.12)
+        }
+    }
+
+    /// Single deep pulse during prologue text reveals — intensity scales with story beat.
+    func prologuePulse(intensity: Float) {
+        guard supportsHaptics else { return }
+        playTransient(intensity: intensity, sharpness: 0.1)
+    }
+
+    /// Heavy thud for year number reveals.
+    func prologueThud() {
+        guard supportsHaptics else { return }
+        playTransient(intensity: 0.6, sharpness: 0.15)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+            self.playTransient(intensity: 0.35, sharpness: 0.08)
+        }
+    }
+
+    /// Begin the hold-to-ignite — start a low continuous rumble.
+    func igniteChargeStart() {
+        guard supportsHaptics else { return }
+        startContinuous(intensity: 0.15, sharpness: 0.05)
+    }
+
+    /// Update the charge as the user holds — ramps intensity with progress (0...1).
+    func igniteChargeUpdate(progress: Float) {
+        guard supportsHaptics, isContinuousActive else { return }
+        let intensity = 0.15 + progress * 0.7
+        let sharpness = 0.05 + progress * 0.4
+        let iParam = CHHapticDynamicParameter(
+            parameterID: .hapticIntensityControl, value: intensity, relativeTime: 0)
+        let sParam = CHHapticDynamicParameter(
+            parameterID: .hapticSharpnessControl, value: sharpness, relativeTime: 0)
+        try? continuousPlayer?.sendParameters([iParam, sParam], atTime: CHHapticTimeImmediate)
+    }
+
+    /// User released before completing — wind down.
+    func igniteChargeCancel() {
+        stopContinuous()
+    }
+
+    /// Ignition complete — sharp burst then silence.
+    func igniteComplete() {
+        stopContinuous()
+        let burst: [(TimeInterval, Float, Float)] = [
+            (0.0, 0.9, 0.7),
+            (0.06, 1.0, 0.8),
+            (0.12, 0.7, 0.5),
+            (0.2, 0.4, 0.3),
+        ]
+        for (delay, intensity, sharpness) in burst {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                self.playTransient(intensity: intensity, sharpness: sharpness)
+            }
+        }
+    }
+
+    // MARK: - UI Interaction Haptics
+    // Haptics for user-initiated actions throughout the app.
+    // Each is designed to feel intentional and match the narrative moment.
+
+    /// "BEGIN MISSION" button — a decisive commitment tap
+    func beginMission() {
+        guard supportsHaptics else { return }
+        playTransient(intensity: 0.6, sharpness: 0.5)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            self.playTransient(intensity: 0.4, sharpness: 0.3)
+        }
+    }
+
+    /// "Start Journey" onboarding — softer, anticipatory
+    func startJourney() {
+        guard supportsHaptics else { return }
+        playTransient(intensity: 0.35, sharpness: 0.25)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            self.playTransient(intensity: 0.5, sharpness: 0.35)
+        }
+    }
+
+    /// Coach mark advance — progressively stronger with each step
+    func onboardingStep(_ step: Int, of total: Int) {
+        guard supportsHaptics else { return }
+        let progress = Float(step) / Float(max(1, total - 1))
+        playTransient(intensity: 0.2 + progress * 0.3, sharpness: 0.3 + progress * 0.2)
+    }
+
+    /// Tab switch — subtle selection acknowledgment
+    func tabSelect() {
+        guard supportsHaptics else { return }
+        playTransient(intensity: 0.2, sharpness: 0.35)
+    }
+
+    /// Play/Pause — energy pulse vs settling tap
+    func playPause(isNowPlaying: Bool) {
+        guard supportsHaptics else { return }
+        if isNowPlaying {
+            playTransient(intensity: 0.4, sharpness: 0.5)
+        } else {
+            playTransient(intensity: 0.3, sharpness: 0.15)
+        }
+    }
+
+    /// Time warp change — sharper at higher multipliers (log-scaled)
+    func timeWarpChange(multiplier: Double) {
+        guard supportsHaptics else { return }
+        let normalized = Float(min(1.0, log10(max(1, multiplier)) / 4.0))
+        playTransient(intensity: 0.25 + normalized * 0.35, sharpness: 0.3 + normalized * 0.3)
+    }
+
+    /// Audio toggle — soft confirmation
+    func audioToggle() {
+        guard supportsHaptics else { return }
+        playTransient(intensity: 0.2, sharpness: 0.3)
+    }
+
+    /// Mission reset — descending pattern (opposite of ignition)
+    func missionReset() {
+        guard supportsHaptics else { return }
+        playTransient(intensity: 0.4, sharpness: 0.4)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            self.playTransient(intensity: 0.25, sharpness: 0.3)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+            self.playTransient(intensity: 0.15, sharpness: 0.2)
+        }
+    }
+
+    /// Timeline card expand/collapse
+    func timelineToggle(expanded: Bool) {
+        guard supportsHaptics else { return }
+        playTransient(intensity: expanded ? 0.3 : 0.2, sharpness: expanded ? 0.4 : 0.2)
+    }
+
+    /// Skip to phase — a forward-motion triplet
+    func skipForward() {
+        guard supportsHaptics else { return }
+        let pattern: [(TimeInterval, Float, Float)] = [
+            (0.0, 0.3, 0.5), (0.06, 0.4, 0.6), (0.12, 0.5, 0.4),
+        ]
+        for (delay, intensity, sharpness) in pattern {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                self.playTransient(intensity: intensity, sharpness: sharpness)
+            }
+        }
+    }
+
+    /// Opening crew chat — like opening a communication channel
+    func openCommChannel() {
+        guard supportsHaptics else { return }
+        playTransient(intensity: 0.25, sharpness: 0.3)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.playTransient(intensity: 0.35, sharpness: 0.4)
+        }
+    }
+
+    /// Sending a chat message — light outbound dispatch
+    func messageSent() {
+        guard supportsHaptics else { return }
+        playTransient(intensity: 0.3, sharpness: 0.5)
+    }
+
+    /// First response token arriving — gentle incoming tap
+    func messageReceived() {
+        guard supportsHaptics else { return }
+        playTransient(intensity: 0.2, sharpness: 0.2)
+    }
+
+    /// Chat reset — brief clearing pattern
+    func chatReset() {
+        guard supportsHaptics else { return }
+        playTransient(intensity: 0.3, sharpness: 0.4)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            self.playTransient(intensity: 0.2, sharpness: 0.2)
+        }
+    }
+
+    /// Challenge slider crossing into/out of safe zone
+    func zoneBoundary(enteringSafe: Bool) {
+        guard supportsHaptics else { return }
+        if enteringSafe {
+            playTransient(intensity: 0.35, sharpness: 0.3)
+        } else {
+            playTransient(intensity: 0.4, sharpness: 0.6)
+        }
+    }
+
+    /// Fly Again — lighter pre-ignition anticipation
+    func flyAgain() {
+        guard supportsHaptics else { return }
+        let taps: [(TimeInterval, Float)] = [
+            (0.0, 0.2), (0.08, 0.3), (0.16, 0.4),
+        ]
+        for (delay, intensity) in taps {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                self.playTransient(intensity: intensity, sharpness: 0.3)
+            }
+        }
+    }
+
     // MARK: - Primitives
 
     private func playTransient(intensity: Float, sharpness: Float) {

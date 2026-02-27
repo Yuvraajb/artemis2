@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		043A56E62F518B45006DC190 /* background_music.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 043A56E52F518B45006DC190 /* background_music.mp3 */; };
+		043A56E82F518E01006DC190 /* dark_noise.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 043A56E72F518E01006DC190 /* dark_noise.mp3 */; };
+		043A56EC2F5199E8006DC190 /* neil.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 043A56EB2F5199E8006DC190 /* neil.mp3 */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		04A3ABF02F3C693E006E388B /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -24,6 +30,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		043A56E52F518B45006DC190 /* background_music.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = background_music.mp3; sourceTree = "<group>"; };
+		043A56E72F518E01006DC190 /* dark_noise.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = dark_noise.mp3; sourceTree = "<group>"; };
+		043A56EB2F5199E8006DC190 /* neil.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = neil.mp3; sourceTree = "<group>"; };
 		04A3ABE22F3C693D006E388B /* artemis2.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = artemis2.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		04A3ABEF2F3C693E006E388B /* artemis2Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = artemis2Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		04A3ABF92F3C693E006E388B /* artemis2UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = artemis2UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -75,6 +84,9 @@
 		04A3ABD92F3C693D006E388B = {
 			isa = PBXGroup;
 			children = (
+				043A56EB2F5199E8006DC190 /* neil.mp3 */,
+				043A56E72F518E01006DC190 /* dark_noise.mp3 */,
+				043A56E52F518B45006DC190 /* background_music.mp3 */,
 				04A3ABE42F3C693D006E388B /* artemis2 */,
 				04A3ABF22F3C693E006E388B /* artemis2Tests */,
 				04A3ABFC2F3C693E006E388B /* artemis2UITests */,
@@ -212,6 +224,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				043A56E62F518B45006DC190 /* background_music.mp3 in Resources */,
+				043A56EC2F5199E8006DC190 /* neil.mp3 in Resources */,
+				043A56E82F518E01006DC190 /* dark_noise.mp3 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

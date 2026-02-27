@@ -47,9 +47,11 @@ struct ContentView: View {
         .environment(a11ySettings)
         .preferredColorScheme(.dark)
         .onChange(of: onboardingStep) { _, newStep in
-            if let step = newStep, selectedTab != step.tab {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    selectedTab = step.tab
+            if let step = newStep {
+                if selectedTab != step.tab {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        selectedTab = step.tab
+                    }
                 }
             }
         }
@@ -68,6 +70,7 @@ struct ContentView: View {
     private func advanceOnboarding() {
         guard let current = onboardingStep else { return }
         let allSteps = OnboardingStep.allCases
+        HapticManager.shared.onboardingStep(current.rawValue, of: allSteps.count)
         if let idx = allSteps.firstIndex(of: current), idx + 1 < allSteps.count {
             withAnimation(.easeInOut(duration: 0.4)) {
                 onboardingStep = allSteps[idx + 1]
@@ -78,10 +81,12 @@ struct ContentView: View {
     }
 
     private func finishOnboarding() {
+        HapticManager.shared.onboardingStep(OnboardingStep.allCases.count - 1, of: OnboardingStep.allCases.count)
         withAnimation(.easeOut(duration: 0.4)) {
             onboardingStep = nil
         }
         hasCompletedOnboarding = true
+        MissionAudioManager.shared.fadeOutAmbient(duration: 4.0)
     }
 
     @ViewBuilder
@@ -139,6 +144,9 @@ struct ContentView: View {
                 .tag(AppTab.settings)
         }
         .tint(.cyan)
+        .onChange(of: selectedTab) { _, _ in
+            HapticManager.shared.tabSelect()
+        }
     }
 }
 
@@ -280,29 +288,42 @@ struct LaunchScreenView: View {
 
                 // Begin button
                 if showButton {
-                    Button(action: onContinue) {
-                        HStack(spacing: 10) {
-                            Text("BEGIN MISSION")
-                                .font(.system(size: 14, weight: .bold, design: .monospaced))
-                                .tracking(3)
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 14, weight: .bold))
+                    VStack(spacing: 16) {
+                        Button(action: {
+                            HapticManager.shared.beginMission()
+                            onContinue()
+                        }) {
+                            HStack(spacing: 10) {
+                                Text("BEGIN MISSION")
+                                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                                    .tracking(3)
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 14, weight: .bold))
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 32)
+                            .padding(.vertical, 14)
+                            .background(
+                                Capsule()
+                                    .fill(Color.cyan.opacity(0.15))
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color.cyan.opacity(0.5), lineWidth: 1)
+                                    )
+                            )
                         }
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 32)
-                        .padding(.vertical, 14)
-                        .background(
-                            Capsule()
-                                .fill(Color.cyan.opacity(0.15))
-                                .overlay(
-                                    Capsule()
-                                        .stroke(Color.cyan.opacity(0.5), lineWidth: 1)
-                                )
-                        )
+                        .accessibilityLabel("Begin mission")
+                        .accessibilityHint("Double tap to start the Artemis II mission simulator")
+
+                        HStack(spacing: 6) {
+                            Image(systemName: "headphones")
+                                .font(.system(size: 11))
+                            Text("Use headphones for the best experience")
+                                .font(.system(size: 11, weight: .regular, design: .monospaced))
+                        }
+                        .foregroundStyle(.white.opacity(0.35))
                     }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .accessibilityLabel("Begin mission")
-                    .accessibilityHint("Double tap to start the Artemis II mission simulator")
                 }
 
                 Spacer()

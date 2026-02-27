@@ -45,13 +45,20 @@ struct MissionControlView: View {
             }
         }
         .animation(.easeInOut(duration: 0.4), value: onboardingStep)
-        .sheet(isPresented: $viewModel.showChallengeSheet) {
-            if let phase = viewModel.activeChallengePhase {
-                ChallengeView(viewModel: viewModel, phase: phase)
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
+        .overlay {
+            if viewModel.showChallengeSheet, let phase = viewModel.activeChallengePhase {
+                ZStack {
+                    Color.black.opacity(0.5)
+                        .ignoresSafeArea()
+                        .onTapGesture { }
+
+                    ChallengeView(viewModel: viewModel, phase: phase)
+                        .transition(.scale(scale: 0.9).combined(with: .opacity))
+                }
+                .transition(.opacity)
             }
         }
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: viewModel.showChallengeSheet)
         .fullScreenCover(isPresented: $viewModel.showMissionComplete) {
             MissionCompleteView(viewModel: viewModel) {
                 viewModel.showMissionComplete = false
@@ -276,9 +283,6 @@ struct MissionControlView: View {
             }
             .overlay(alignment: .bottomTrailing) {
                 if onboardingStep == .orbitalView, let next = onNext, let skip = onSkip {
-                    // #region agent log
-                    let _ = _dlog("MissionControlView:overlay", "orbitalView card VISIBLE", hyp: "H5")
-                    // #endregion
                     CoachMarkCard(
                         title: OnboardingStep.orbitalView.title,
                         message: OnboardingStep.orbitalView.message,
@@ -514,7 +518,10 @@ struct TimeControlPanel: View {
     var body: some View {
         HStack(spacing: 12) {
             // Play/Pause button
-            Button(action: { viewModel.togglePlayPause() }) {
+            Button(action: {
+                HapticManager.shared.playPause(isNowPlaying: !viewModel.isRunning)
+                viewModel.togglePlayPause()
+            }) {
                 Image(systemName: viewModel.isRunning ? "pause.fill" : "play.fill")
                     .font(.system(size: 20))
                     .foregroundStyle(.white)
@@ -533,7 +540,10 @@ struct TimeControlPanel: View {
             // Time warp selector
             HStack(spacing: 4) {
                 ForEach(TimeWarp.allCases) { warp in
-                    Button(action: { viewModel.setTimeWarp(warp) }) {
+                    Button(action: {
+                        HapticManager.shared.timeWarpChange(multiplier: warp.rawValue)
+                        viewModel.setTimeWarp(warp)
+                    }) {
                         VStack(spacing: 2) {
                             Image(systemName: warp.icon)
                                 .font(.system(size: 10))
@@ -566,7 +576,10 @@ struct TimeControlPanel: View {
             Spacer()
 
             // Audio toggle
-            Button(action: { viewModel.toggleAudio() }) {
+            Button(action: {
+                HapticManager.shared.audioToggle()
+                viewModel.toggleAudio()
+            }) {
                 Image(systemName: viewModel.isAudioEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
                     .font(.system(size: 14))
                     .foregroundStyle(viewModel.isAudioEnabled ? .cyan : .white.opacity(0.4))
@@ -577,10 +590,13 @@ struct TimeControlPanel: View {
                     )
             }
             .accessibilityLabel(viewModel.isAudioEnabled ? "Mute mission audio" : "Enable mission audio")
-            .accessibilityHint("Double tap to toggle the mission narration and ambient audio")
+            .accessibilityHint("Double tap to toggle mission ambient audio")
 
             // Reset button
-            Button(action: { viewModel.resetMission() }) {
+            Button(action: {
+                HapticManager.shared.missionReset()
+                viewModel.resetMission()
+            }) {
                 Image(systemName: "arrow.counterclockwise")
                     .font(.system(size: 14))
                     .foregroundStyle(.white.opacity(0.6))

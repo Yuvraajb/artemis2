@@ -104,20 +104,11 @@ struct CrewCircleCard: View {
                     .stroke(roleColor.opacity(0.3), lineWidth: isWide ? 2.5 : 2)
                     .frame(width: avatarSize, height: avatarSize)
 
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [roleColor.opacity(0.15), Color.white.opacity(0.05)],
-                            center: .center,
-                            startRadius: 5,
-                            endRadius: innerSize / 2
-                        )
-                    )
+                Image(member.imageName)
+                    .resizable()
+                    .scaledToFill()
                     .frame(width: innerSize, height: innerSize)
-
-                Text(initials)
-                    .font(.system(size: isWide ? 30 : 26, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .clipShape(Circle())
 
                 VStack {
                     Spacer()
@@ -172,6 +163,9 @@ struct CrewCircleCard: View {
                         .overlay(Capsule().stroke(Color.cyan.opacity(0.25), lineWidth: 1))
                 )
             }
+            .simultaneousGesture(TapGesture().onEnded {
+                HapticManager.shared.openCommChannel()
+            })
             .accessibilityLabel("Chat with \(member.name)")
             .accessibilityHint("Double tap to open a conversation with \(member.name)")
         }

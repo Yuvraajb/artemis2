@@ -33,13 +33,9 @@ struct CrewChatView: View {
             Color(red: 0.02, green: 0.02, blue: 0.08)
                 .ignoresSafeArea()
 
-            if viewModel.isModelAvailable {
-                chatContent
-                    .frame(maxWidth: isWide ? 680 : .infinity)
-                    .frame(maxWidth: .infinity)
-            } else {
-                unavailableView
-            }
+            chatContent
+                .frame(maxWidth: isWide ? 680 : .infinity)
+                .frame(maxWidth: .infinity)
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -47,7 +43,10 @@ struct CrewChatView: View {
                 astronautHeader
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button(action: { viewModel.resetChat() }) {
+                Button(action: {
+                    HapticManager.shared.chatReset()
+                    viewModel.resetChat()
+                }) {
                     Image(systemName: "arrow.counterclockwise")
                         .font(.system(size: 13))
                         .foregroundStyle(.white.opacity(0.6))
@@ -72,6 +71,7 @@ struct CrewChatView: View {
                                 ChatBubble(
                                     message: message,
                                     astronautName: viewModel.crewMember.name,
+                                    astronautImage: viewModel.crewMember.imageName,
                                     isStreaming: viewModel.isGenerating && message.id == viewModel.messages.last?.id && message.role == .astronaut
                                 )
                                 .id(message.id)
@@ -81,7 +81,7 @@ struct CrewChatView: View {
 
                         // Bouncing dots — only before first token arrives
                         if showTypingDots {
-                            TypingDotsIndicator()
+                            TypingDotsIndicator(astronautImage: viewModel.crewMember.imageName)
                                 .transition(.opacity.combined(with: .scale(scale: 0.8)))
                                 .id("typing-dots")
                         }
@@ -138,6 +138,7 @@ struct CrewChatView: View {
 
             // Send button
             Button(action: {
+                HapticManager.shared.messageSent()
                 Task { await viewModel.sendMessage() }
             }) {
                 Image(systemName: "arrow.up.circle.fill")
@@ -170,14 +171,11 @@ struct CrewChatView: View {
 
     private var astronautHeader: some View {
         HStack(spacing: 8) {
-            ZStack {
-                Circle()
-                    .fill(Color.white.opacity(0.1))
-                    .frame(width: 28, height: 28)
-                Image(systemName: "person.circle.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.7))
-            }
+            Image(viewModel.crewMember.imageName)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 28, height: 28)
+                .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(viewModel.crewMember.name)
@@ -193,34 +191,11 @@ struct CrewChatView: View {
     // MARK: - Astronaut Avatar (reusable)
 
     private var astronautAvatarSmall: some View {
-        ZStack {
-            Circle()
-                .fill(Color.white.opacity(0.1))
-                .frame(width: 28, height: 28)
-            Image(systemName: "person.circle.fill")
-                .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.6))
-        }
-    }
-
-    // MARK: - Unavailable View
-
-    private var unavailableView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "brain")
-                .font(.system(size: 40))
-                .foregroundStyle(.white.opacity(0.3))
-
-            Text("On-Device AI Required")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(.white)
-
-            Text("Chatting with the crew requires Apple Intelligence and the Foundation Models framework. This feature is available on iPhone 15 Pro or later running iOS 26.")
-                .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.6))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-        }
+        Image(viewModel.crewMember.imageName)
+            .resizable()
+            .scaledToFill()
+            .frame(width: 28, height: 28)
+            .clipShape(Circle())
     }
 
     // MARK: - Helpers
@@ -237,20 +212,17 @@ struct CrewChatView: View {
 // MARK: - Typing Dots Indicator (self-contained animation)
 
 struct TypingDotsIndicator: View {
+    var astronautImage: String = ""
     @State private var animating = false
     @Environment(AccessibilitySettings.self) private var a11y
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
-            // Avatar
-            ZStack {
-                Circle()
-                    .fill(Color.white.opacity(0.1))
-                    .frame(width: 28, height: 28)
-                Image(systemName: "person.circle.fill")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.6))
-            }
+            Image(astronautImage)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 28, height: 28)
+                .clipShape(Circle())
 
             if a11y.reduceMotion {
                 // Static "typing..." text instead of animated dots
@@ -314,6 +286,7 @@ struct TypingDotsIndicator: View {
 struct ChatBubble: View {
     let message: ChatMessage
     let astronautName: String
+    var astronautImage: String = ""
     var isStreaming: Bool = false
 
     private var isUser: Bool {
@@ -381,14 +354,11 @@ struct ChatBubble: View {
     }
 
     private var astronautAvatar: some View {
-        ZStack {
-            Circle()
-                .fill(Color.white.opacity(0.1))
-                .frame(width: 28, height: 28)
-            Image(systemName: "person.circle.fill")
-                .font(.system(size: 14))
-                .foregroundStyle(.white.opacity(0.6))
-        }
+        Image(astronautImage)
+            .resizable()
+            .scaledToFill()
+            .frame(width: 28, height: 28)
+            .clipShape(Circle())
     }
 }
 

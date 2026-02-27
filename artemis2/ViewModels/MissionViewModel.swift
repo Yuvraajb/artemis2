@@ -103,16 +103,19 @@ final class MissionViewModel {
         isRunning = true
         startTimer()
         HapticManager.shared.resumeContinuous()
+        MissionAudioManager.shared.startAmbient(for: currentPhase)
     }
 
     func pauseMission() {
         isRunning = false
         stopTimer()
         HapticManager.shared.pauseContinuous()
+        MissionAudioManager.shared.pauseAmbient()
     }
 
     func toggleAudio() {
         isAudioEnabled.toggle()
+        MissionAudioManager.shared.isEnabled = isAudioEnabled
     }
 
     func togglePlayPause() {
@@ -164,6 +167,7 @@ final class MissionViewModel {
     func resetMission() {
         pauseMission()
         HapticManager.shared.stopContinuous()
+        MissionAudioManager.shared.reset()
         missionTime = -600
         lastMilestoneIndex = -1
         lastCountdownSecond = Int.max
@@ -227,6 +231,7 @@ final class MissionViewModel {
 
         if newPhase != previousPhase {
             HapticManager.shared.phaseTransition(from: previousPhase, to: newPhase)
+            MissionAudioManager.shared.updatePhase(newPhase)
             previousPhase = newPhase
         }
         currentPhase = newPhase
@@ -280,7 +285,6 @@ final class MissionViewModel {
                 showMilestoneAlert = true
                 HapticManager.shared.milestoneHaptic(name: milestone.name)
 
-                // If it's an interactive milestone, pause and show challenge
                 if milestone.isInteractive {
                     pauseMission()
                     activeChallengePhase = milestone.phase

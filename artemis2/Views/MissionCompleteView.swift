@@ -348,6 +348,7 @@ struct MissionCompleteView: View {
             .accessibilityLabel("Share mission report")
 
             Button(action: {
+                HapticManager.shared.flyAgain()
                 viewModel.resetMission()
                 onDismiss()
             }) {
